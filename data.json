@@ -1,0 +1,15 @@
+{
+  "orders": [],
+  "newsletter": [],
+  "users": [],
+  "products": [],
+  "sessions": {},
+  "reviews": [],
+  "coupons": [],
+  "returns": [],
+  "notifications": [],
+  "audit": [],
+  "settings": {"gst": 5, "shipping": 99, "freeShipping": 1999, "gateway": {}, "courier": {}, "notifications": {}, "role": "Super Admin"},
+  "site": {"hero": "YOUR TYPE", "announcement": "New drops every week", "sections": {"home": true, "collections": true, "motion": true, "featured": true, "bestSellers": true, "newCollection": true, "trending": true, "womenTops": true, "highlights": true, "editorial": true, "newsletter": true}, "sectionProducts": {}, "colorPalette": ["Black", "White", "Charcoal", "Red", "Blue", "Green"], "store": {"name": "YOUR TYPE", "phone": "", "whatsapp": "", "email": "", "address": "", "currency": "INR"}, "content": {"banner": "", "bannerButton": "", "bannerLink": ""}},
+  "deletedProductIds": []
+}

@@ -900,139 +900,64 @@ html{scroll-padding-top:110px}
   .grid .card .add,.curatedGrid .card .add{min-height:38px;font-size:7.5px}
 }
 
-/* PRODUCT MOTION POLISH — storefront cards only.
-   Adds restrained entrance/hover motion without changing product data,
-   section assignment, panel controls, theme structure, or layout geometry. */
-@keyframes ytProductCardIn{
-  0%{opacity:0;transform:translateY(14px) scale(.985)}
-  100%{opacity:1;transform:translateY(0) scale(1)}
-}
-@keyframes ytProductSheen{
-  0%{transform:translateX(-135%) skewX(-16deg);opacity:0}
-  18%{opacity:.16}
-  100%{transform:translateX(135%) skewX(-16deg);opacity:0}
-}
-@keyframes ytProductGlow{
-  0%,100%{box-shadow:0 0 0 rgba(255,255,255,0)}
-  50%{box-shadow:0 0 24px rgba(255,255,255,.035)}
+/* FINAL MOBILE STOREFRONT POLISH — website only.
+   Keep 1–3 products comfortably sized; when 4+ are assigned, keep all four on one row.
+   Cards use a shared compact geometry so artwork is not trapped in oversized empty boxes. */
+@media (max-width: 520px){
+  .productsSection,.curatedSection{padding-left:10px;padding-right:10px}
+  .grid,.curatedGrid{width:100%;gap:6px;align-items:stretch}
+
+  /* Responsive count: 4 assigned products stay on one row; 3 or fewer stay larger. */
+  .grid:not(:has(> .card:nth-child(2))),
+  .curatedGrid:not(:has(> .card:nth-child(2))){grid-template-columns:1fr}
+  .grid:has(> .card:nth-child(2)):not(:has(> .card:nth-child(3))),
+  .curatedGrid:has(> .card:nth-child(2)):not(:has(> .card:nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid:has(> .card:nth-child(3)):not(:has(> .card:nth-child(4))),
+  .curatedGrid:has(> .card:nth-child(3)):not(:has(> .card:nth-child(4))){grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid:has(> .card:nth-child(4)),
+  .curatedGrid:has(> .card:nth-child(4)){grid-template-columns:repeat(4,minmax(0,1fr))}
+
+  .grid .card,.curatedGrid .card{width:100%;min-width:0;height:auto;display:flex;flex-direction:column}
+  .grid .card .pic,.curatedGrid .card .pic{
+    width:100%;height:auto;min-height:0;flex:0 0 auto;aspect-ratio:1/1.08
+  }
+  .grid .card .pic img,.curatedGrid .card .pic img{
+    width:94%;height:94%;object-fit:contain;display:block
+  }
+  .grid .card .info,.curatedGrid .card .info{
+    min-height:82px;height:auto;padding:7px 6px 6px;display:flex;flex-direction:column;flex:1
+  }
+  .grid .card .productNo,.curatedGrid .card .productNo{font-size:5px;line-height:1;letter-spacing:.7px}
+  .grid .card .info h3,.curatedGrid .card .info h3{
+    font-size:8px;line-height:1.12;margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  }
+  .grid .card .price,.curatedGrid .card .price{font-size:8px;line-height:1.1}
+  .grid .card .sizes,.curatedGrid .card .sizes{gap:2px;margin:5px 0 5px}
+  .grid .card .sizes button,.curatedGrid .card .sizes button{
+    min-width:0;flex:1;padding:4px 1px;font-size:6px;line-height:1;height:19px
+  }
+  .grid .card .add,.curatedGrid .card .add{
+    min-height:28px;height:28px;padding:6px 2px;margin-top:auto;font-size:6.5px;letter-spacing:.8px;line-height:1
+  }
+  .grid .card .heart,.curatedGrid .card .heart{
+    min-width:27px;min-height:27px;width:27px;height:27px;right:2px;top:2px;font-size:16px
+  }
+  .grid .card .badge,.curatedGrid .card .badge{left:4px;top:4px;padding:2px 3px;font-size:5px}
+
+  /* Readable mobile section scale without making the whole page look zoomed out. */
+  .sectionHead{margin-bottom:16px}
+  .sectionHead h2{font-size:32px;line-height:.95;letter-spacing:-1.7px}
+  .sectionNote{font-size:10px;line-height:1.5}
+  .sectionHead span{font-size:7px;letter-spacing:1.2px}
 }
 
-.grid .card,
-.curatedGrid .card{
-  position:relative;
-  overflow:hidden;
-  isolation:isolate;
-  animation:ytProductCardIn .55s cubic-bezier(.2,.75,.2,1) both;
-  transition:transform .32s cubic-bezier(.2,.75,.2,1),
-             border-color .32s ease,
-             box-shadow .32s ease,
-             background-color .32s ease;
-}
-.grid .card:nth-child(2),
-.curatedGrid .card:nth-child(2){animation-delay:.05s}
-.grid .card:nth-child(3),
-.curatedGrid .card:nth-child(3){animation-delay:.10s}
-.grid .card:nth-child(4),
-.curatedGrid .card:nth-child(4){animation-delay:.15s}
-.grid .card:nth-child(5),
-.curatedGrid .card:nth-child(5){animation-delay:.20s}
-.grid .card:nth-child(6),
-.curatedGrid .card:nth-child(6){animation-delay:.25s}
-.grid .card:nth-child(7),
-.curatedGrid .card:nth-child(7){animation-delay:.30s}
-.grid .card:nth-child(8),
-.curatedGrid .card:nth-child(8){animation-delay:.35s}
-
-.grid .card .pic,
-.curatedGrid .card .pic{
-  position:relative;
-}
-.grid .card .pic::after,
-.curatedGrid .card .pic::after{
-  content:"";
-  position:absolute;
-  inset:-20% auto -20% -45%;
-  width:28%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
-  transform:translateX(-135%) skewX(-16deg);
-  pointer-events:none;
-  z-index:3;
-}
-.grid .card .pic img,
-.curatedGrid .card .pic img{
-  position:relative;
-  z-index:1;
-  transition:transform .65s cubic-bezier(.2,.75,.2,1),
-             filter .65s ease;
-}
-.grid .card .info,
-.curatedGrid .card .info{
-  position:relative;
-  z-index:4;
-  transition:background-color .3s ease;
-}
-
-@media (hover:hover) and (pointer:fine){
-  .grid .card:hover,
-  .curatedGrid .card:hover{
-    transform:translateY(-4px);
-    border-color:#3a3a3a;
-    background:#0e0e0e;
-    animation:ytProductGlow 1.8s ease-in-out infinite;
-  }
-  .grid .card:hover .pic img,
-  .curatedGrid .card:hover .pic img{
-    transform:scale(1.045);
-    filter:brightness(1.06);
-  }
-  .grid .card:hover .pic::after,
-  .curatedGrid .card:hover .pic::after{
-    animation:ytProductSheen .9s ease-out 1;
-  }
-  .grid .card:hover .info,
-  .curatedGrid .card:hover .info{
-    background:rgba(255,255,255,.012);
-  }
-  .grid .card .sizes button:not(:disabled),
-  .curatedGrid .card .sizes button:not(:disabled){
-    transition:transform .18s ease,border-color .18s ease,color .18s ease,background .18s ease;
-  }
-  .grid .card .sizes button:not(:disabled):hover,
-  .curatedGrid .card .sizes button:not(:disabled):hover{
-    transform:translateY(-1px);
-    border-color:#555;
-    color:#fff;
-  }
-}
-
-.grid .card:active,
-.curatedGrid .card:active{
-  transform:scale(.992);
-}
-
-@media (max-width:520px){
-  .grid .card,
-  .curatedGrid .card{
-    animation-duration:.45s;
-  }
-  .grid .card .pic::after,
-  .curatedGrid .card .pic::after{
-    display:none;
-  }
-}
-
-@media (prefers-reduced-motion:reduce){
-  .grid .card,
-  .curatedGrid .card,
-  .grid .card .pic img,
-  .curatedGrid .card .pic img,
-  .grid .card .info,
-  .curatedGrid .card .info{
-    animation:none !important;
-    transition:none !important;
-  }
-  .grid .card .pic::after,
-  .curatedGrid .card .pic::after{
-    display:none !important;
-  }
+/* On very narrow phones, keep the four-column requirement but reclaim every possible pixel. */
+@media (max-width:389px){
+  .productsSection,.curatedSection{padding-left:7px;padding-right:7px}
+  .grid,.curatedGrid{gap:4px}
+  .grid .card .info,.curatedGrid .card .info{padding-left:5px;padding-right:5px;min-height:78px}
+  .grid .card .info h3,.curatedGrid .card .info h3{font-size:7.5px}
+  .grid .card .price,.curatedGrid .card .price{font-size:7.5px}
+  .grid .card .sizes button,.curatedGrid .card .sizes button{font-size:5.5px;padding-left:0;padding-right:0}
+  .grid .card .add,.curatedGrid .card .add{font-size:6px;letter-spacing:.55px}
 }

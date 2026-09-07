@@ -845,3 +845,19 @@ html{scroll-padding-top:110px}
 .sectionProductsHead{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.sectionProductsHead b{margin-right:auto}
 .sectionProductChoices{display:grid;gap:7px;max-height:220px;overflow:auto;margin-top:10px}
 .sectionProductChoice{display:flex;gap:8px;align-items:center;font-size:13px}
+
+/* MOBILE PRODUCT PRESENTATION FIX — keep the existing YOUR TYPE theme, but give phone users a readable single-card layout. */
+@media(max-width:520px){
+  .productsSection .grid,
+  .curatedGrid{grid-template-columns:1fr;gap:16px}
+  .productsSection .grid .card,
+  .curatedGrid .card{width:100%}
+  .productsSection .grid .pic,
+  .curatedGrid .card .pic{height:360px}
+  .productsSection .grid .info,
+  .curatedGrid .card .info{padding:14px}
+  .productsSection .grid .info h3,
+  .curatedGrid .card .info h3{font-size:13px}
+  .productsSection .grid .price,
+  .curatedGrid .card .price{font-size:12px}
+}

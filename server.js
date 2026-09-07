@@ -17,7 +17,7 @@ const STATUSES=['New','Processing','Confirmed','Packed','Shipped','Out for Deliv
 const SIZES=['S','M','L','XL','XXL'];
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.mp4':'video/mp4','.txt':'text/plain; charset=utf-8'};
 
-if(!process.env.VERCEL)fs.mkdirSync(UPLOADS,{recursive:true});
+fs.mkdirSync(UPLOADS,{recursive:true});
 
 function strongPassword(s){return typeof s==='string'&&s.length>=12&&s.length<=128&&/[A-Z]/.test(s)&&/[a-z]/.test(s)&&/[0-9]/.test(s)&&/[^A-Za-z0-9]/.test(s)}
 function hashPassword(s,salt){return crypto.scryptSync(String(s),salt,64).toString('hex')}
@@ -29,7 +29,7 @@ function verifyAdminPassword(password){if(!adminAuth)return false;const a=Buffer
 function load(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch{return {orders:[],newsletter:[],users:[],products:[],sessions:{}}}}
 let storageReady=false;
 function save(db){
-  if(!process.env.VERCEL)fs.writeFileSync(DATA,JSON.stringify(db,null,2));
+  fs.writeFileSync(DATA,JSON.stringify(db,null,2));
   if(storageReady && supabaseStore.enabled){
     supabaseStore.queueSave(db).catch(err=>console.error('[Supabase] save failed:',err.message||err));
   }
@@ -87,7 +87,7 @@ async function api(req,res,p){
   if(req.method==='GET'&&p==='/api/auth/orders'){const s=auth(req,'customer');if(!s)return send(res,401,{error:'Unauthorized'},'application/json',origin);return send(res,200,{orders:db.orders.filter(o=>o.userId===s.userId).map(o=>({orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items}))},'application/json',origin)}
   if(req.method==='POST'&&p==='/api/newsletter'){const x=await body(req),email=String(x.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return send(res,400,{error:'Invalid email'},'application/json',origin);if(!db.newsletter.some(v=>v.email===email))db.newsletter.push({email,createdAt:new Date().toISOString()});save(db);return send(res,201,{ok:true},'application/json',origin)}
   if(req.method==='GET'&&p==='/api/site-config')return send(res,200,{site:db.site},'application/json',origin);
-  if(req.method==='PATCH'&&p==='/api/admin/site-config'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);if(x.hero!==undefined)db.site.hero=String(x.hero);if(x.announcement!==undefined)db.site.announcement=String(x.announcement);if(x.sections&&typeof x.sections==='object')db.site.sections=x.sections;if(x.sectionProducts&&typeof x.sectionProducts==='object')db.site.sectionProducts=x.sectionProducts;if(Array.isArray(x.colorPalette))db.site.colorPalette=x.colorPalette.map(v=>String(v).trim()).filter(Boolean);audit('site.update');await saveAndFlush(db);return send(res,200,{ok:true,site:db.site},'application/json',origin)}
+  if(req.method==='PATCH'&&p==='/api/admin/site-config'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);if(x.hero!==undefined)db.site.hero=String(x.hero);if(x.announcement!==undefined)db.site.announcement=String(x.announcement);if(x.sections&&typeof x.sections==='object')db.site.sections=x.sections;if(x.sectionProducts&&typeof x.sectionProducts==='object'){const validIds=new Set(db.products.map(p=>String(p.id)));db.site.sectionProducts=Object.fromEntries(Object.entries(x.sectionProducts).map(([key,value])=>[String(key),Array.isArray(value)?[...new Set(value.map(String).filter(id=>validIds.has(id)))]:[]]));}if(Array.isArray(x.colorPalette))db.site.colorPalette=x.colorPalette.map(v=>String(v).trim()).filter(Boolean);audit('site.update');await saveAndFlush(db);return send(res,200,{ok:true,site:db.site},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/products')return send(res,200,{products:db.products.filter(p=>p.active!==false).map(safeProduct)},'application/json',origin);
   if(req.method==='GET'&&p.startsWith('/api/reviews/')){const name=decodeURIComponent(p.slice('/api/reviews/'.length));return send(res,200,{reviews:db.reviews.filter(r=>r.product===name).slice(-50).reverse()},'application/json',origin)}
@@ -200,25 +200,13 @@ async function api(req,res,p){
  }catch(e){console.error(e);return send(res,500,{error:'Server error'},'application/json',origin)}
 }
 
-async function handleRequest(req,res){
+const server=http.createServer(async(req,res)=>{
  const u=new URL(req.url,'http://localhost'),p=u.pathname;
- try{
-  if(p.startsWith('/api/')||p.startsWith('/uploads/')){
-    await ready;
-    return api(req,res,p);
-  }
-  await ready;
-  const file=path.normalize(path.join(ROOT,p==='/'?'index.html':p));
-  const protectedStatic=new Set(['admin-auth.json','data.json','package.json','render.yaml','vercel.json']);
-  if(protectedStatic.has(path.basename(file).toLowerCase()))return send(res,404,'Not found','text/plain');
-  if(!file.startsWith(ROOT)||!fs.existsSync(file)||fs.statSync(file).isDirectory())return send(res,404,'Not found','text/plain');
-  try{const ext=path.extname(file).toLowerCase();res.writeHead(200,{'Content-Type':mime[ext]||'application/octet-stream','Cache-Control':'no-store'});res.end(fs.readFileSync(file))}catch{send(res,404,'Not found','text/plain')}
- }catch(e){
-  console.error('[Request] Failed:',e.message||e);
-  if(!res.headersSent)send(res,503,'Service temporarily unavailable','text/plain');
- }
-}
-const server=http.createServer(handleRequest);
+ if(p.startsWith('/api/')||p.startsWith('/uploads/'))return api(req,res,p);
+ const file=path.normalize(path.join(ROOT,p==='/'?'index.html':p));
+ if(!file.startsWith(ROOT)||!fs.existsSync(file)||fs.statSync(file).isDirectory())return send(res,404,'Not found','text/plain');
+ try{const ext=path.extname(file).toLowerCase();res.writeHead(200,{'Content-Type':mime[ext]||'application/octet-stream','Cache-Control':'no-store'});res.end(fs.readFileSync(file))}catch{send(res,404,'Not found','text/plain')}
+});
 async function bootstrap(){
   try{
     if(supabaseStore.enabled){
@@ -229,16 +217,11 @@ async function bootstrap(){
       db.products=db.products.filter(p=>!db.deletedProductIds.includes(String(p.id)));
     }
     storageReady=true;
-    if(!process.env.VERCEL)fs.writeFileSync(DATA,JSON.stringify(db,null,2));
-    if(!process.env.VERCEL)server.listen(PORT,()=>console.log(`YOUR TYPE running at http://localhost:${PORT}`));
+    fs.writeFileSync(DATA,JSON.stringify(db,null,2));
+    server.listen(PORT,()=>console.log(`YOUR TYPE running at http://localhost:${PORT}`));
   }catch(e){
-    storageReady=false;
     console.error('[Storage] Startup failed:',e.message||e);
-    if(!process.env.VERCEL)process.exit(1);
-    throw e;
+    process.exit(1);
   }
 }
-const ready=bootstrap();
-handleRequest.ready=ready;
-handleRequest.handleApi=api;
-module.exports=handleRequest;
+bootstrap();

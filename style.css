@@ -736,7 +736,7 @@ body.light .footBrandName{color:#111}
 .highlightsSection{padding-bottom:110px}.highlightCards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:30px}.highlightCards article{border:1px solid #242424;border-radius:22px;padding:24px;background:#0b0b0b}.highlightCards span{font-size:22px;color:#bbb}.highlightCards h3{font-size:14px;letter-spacing:2px;margin:30px 0 10px}.highlightCards p{color:#777;line-height:1.7;font-size:12px;margin:0}
 body.light .curatedSection,body.light .trendSection,body.light .highlightsSection{border-color:#ddd}.body.light .trendSection{background:#fafafa}
 @media(max-width:900px){.curatedSection,.trendSection,.highlightsSection{padding:70px 5vw}.curatedGrid{grid-template-columns:repeat(2,1fr)}.trendSection{grid-template-columns:1fr}.highlightCards{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){.curatedSection,.trendSection,.highlightsSection{padding:58px 20px}.curatedGrid{gap:10px}.curatedGrid .card .info{padding:11px}.trendCards{grid-template-columns:1fr}.trendCard{min-height:150px}.highlightCards{grid-template-columns:1fr}.trendCopy h2{letter-spacing:-2px}.textLink{font-size:9px}}
+@media(max-width:520px){.curatedSection,.trendSection,.highlightsSection{padding:58px 8px}.curatedGrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%}.curatedGrid .card{min-width:0}.curatedGrid .card .pic{height:auto;aspect-ratio:3/4}.curatedGrid .card .info{padding:8px 6px}.curatedGrid .card .info h3{font-size:9px;line-height:1.25;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.curatedGrid .card .price{font-size:9px}.curatedGrid .card .sizes{gap:2px;margin:7px 0}.curatedGrid .card .sizes button{padding:4px 3px;font-size:7px;min-width:0}.curatedGrid .card .add{font-size:7px;padding:9px 2px;letter-spacing:.2px}.trendCards{grid-template-columns:1fr}.trendCard{min-height:150px}.highlightCards{grid-template-columns:1fr}.trendCopy h2{letter-spacing:-2px}.textLink{font-size:9px}}
 
 /* MOTION SHOP CTA: keeps the existing dark theme and makes every motion card purchase-ready. */
 .motionShopBtn{margin-top:8px;width:100%;border:1px solid rgba(255,255,255,.22);background:#111;color:#fff;padding:10px 12px;font-size:9px;letter-spacing:2px;cursor:pointer;opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease,background .25s ease}.motionCard.isCenter .motionShopBtn{opacity:1;transform:translateY(0)}.motionShopBtn:hover{background:#1c1c1c}.motionCardInfo{align-items:center}
@@ -845,19 +845,3 @@ html{scroll-padding-top:110px}
 .sectionProductsHead{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.sectionProductsHead b{margin-right:auto}
 .sectionProductChoices{display:grid;gap:7px;max-height:220px;overflow:auto;margin-top:10px}
 .sectionProductChoice{display:flex;gap:8px;align-items:center;font-size:13px}
-
-/* MOBILE PRODUCT PRESENTATION FIX — keep the existing YOUR TYPE theme, but give phone users a readable single-card layout. */
-@media(max-width:520px){
-  .productsSection .grid,
-  .curatedGrid{grid-template-columns:1fr;gap:16px}
-  .productsSection .grid .card,
-  .curatedGrid .card{width:100%}
-  .productsSection .grid .pic,
-  .curatedGrid .card .pic{height:360px}
-  .productsSection .grid .info,
-  .curatedGrid .card .info{padding:14px}
-  .productsSection .grid .info h3,
-  .curatedGrid .card .info h3{font-size:13px}
-  .productsSection .grid .price,
-  .curatedGrid .card .price{font-size:12px}
-}

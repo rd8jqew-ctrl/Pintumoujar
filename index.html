@@ -462,10 +462,10 @@ function updateCart(){
  let total=cart.reduce((s,p)=>s+cartItemTotal(p),0);document.getElementById('cartTotal').textContent=money(total);
 }
 function removeItem(i){cart.splice(i,1);saveCart()}
-function openCart(){closeWishlist();location.href='bag.html'}
+function openCart(){closeWishlist();window.ytNavigate('bag.html')}
 function closeCart(){document.getElementById('cart').classList.remove('open');document.getElementById('overlay').classList.remove('show')}
 function toggleSearch(){const bar=document.getElementById('searchbar');bar.classList.toggle('show');if(bar.classList.contains('show'))document.getElementById('searchInput').focus()}
-function checkout(){if(!cart.length){showModal('Your Bag','Your bag is empty. Add a product before checkout.');return}location.href='checkout.html'}
+function checkout(){if(!cart.length){showModal('Your Bag','Your bag is empty. Add a product before checkout.');return}window.ytNavigate('checkout.html')}
 function selectModalSize(btn,size){
  const wrap=btn?.parentElement; if(!wrap)return;
  wrap.querySelectorAll('button').forEach(x=>x.classList.remove('chosen')); btn.classList.add('chosen'); selectedSize=size;
@@ -482,7 +482,7 @@ function modalBuyNow(i){
  const z=p[6]||{S:p[5]??20,M:p[5]??20,L:p[5]??20,XL:p[5]??20,XXL:p[5]??20};
  const size=selectedSize||'M';
  if(Number(z[size]||0)<=0){showModal('SIZE UNAVAILABLE',`<p class="muted">${esc(p[0])} in size ${size} is currently sold out.</p>`);return;}
- cart.push({...p,size,color:'Black',qty:1}); saveCart(); closeModal(); location.href='checkout.html';
+ cart.push({...p,size,color:'Black',qty:1}); saveCart(); closeModal(); window.ytNavigate('checkout.html');
 }
 function toggleModalWishlist(i,btn){
  const p=products[i]; if(!p)return;

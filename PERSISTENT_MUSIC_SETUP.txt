@@ -1,0 +1,7 @@
+PERSISTENT LIVE MUSIC
+
+The Live Music player now stays mounted while users move between the store pages using normal internal links. Navigation is handled without a full page reload, so the YouTube iframe is preserved and the song does not restart on each page.
+
+For links triggered by JavaScript, use window.ytNavigate("page.html") instead of location.href so the player remains alive.
+
+Browser/app termination, a hard refresh, opening a new tab, or browser autoplay restrictions can still stop/restart playback; those are browser limitations.

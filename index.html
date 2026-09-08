@@ -368,7 +368,7 @@ function toggleWishlist(event,btn,i){
    btn.classList.add('heartPop','likePulse');
  }
  updateWishlist();
- showWishlistToast(adding?'SAVED TO WISHLIST':'REMOVED FROM WISHLIST');
+ showBookmarkToast(p,adding?'saved':'removed',i);
  try{
    const token=localStorage.getItem('yourTypeCustomerToken');
    if(token){
@@ -377,7 +377,21 @@ function toggleWishlist(event,btn,i){
  }catch(e){}
 }
 function getVisitorId(){let v=localStorage.getItem('yourTypeVisitorId');if(!v){v=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2));localStorage.setItem('yourTypeVisitorId',v)}return v}
-function showWishlistToast(text){const el=document.getElementById('wishlistToast');if(!el)return;el.textContent='♥  '+text;el.classList.add('show');clearTimeout(window.__likeToast);window.__likeToast=setTimeout(()=>el.classList.remove('show'),1000)}
+function showWishlistToast(text){const el=document.getElementById('wishlistToast');if(!el)return;el.className='likeToast show';el.textContent='♥  '+text;clearTimeout(window.__likeToast);window.__likeToast=setTimeout(()=>el.classList.remove('show'),1000)}
+function showBookmarkToast(product,action,index){
+ const el=document.getElementById('wishlistToast'); if(!el||!product)return;
+ const saved=action==='saved';
+ el.className='likeToast likeToastCard show';
+ el.innerHTML=`<div class="likeToastHead"><span>${wishlist.length} SAVED</span><button type="button" aria-label="Close" onclick="hideBookmarkToast()">×</button></div>`+
+   `<div class="likeToastBanner ${saved?'saved':''}"><span class="likeToastCheck">${saved?'✓':'–'}</span><b>${saved?'Saved to wishlist':'Removed from wishlist'}</b></div>`+
+   `<div class="likeToastProduct"><div class="likeToastThumb"><img src="${productImage(product[2])}" alt="${esc(product[0])}" loading="lazy" draggable="false" onerror="this.style.visibility='hidden'"></div>`+
+   `<div class="likeToastInfo"><b>${esc(product[0])}</b><span>${esc(product[1])}</span></div>`+
+   (saved?`<div class="likeToastActions"><button type="button" onclick="event.stopPropagation();addWishlistToBag(${index},this)">ADD +</button><button type="button" aria-label="Remove" onclick="event.stopPropagation();removeWishlistByIndex(${index});hideBookmarkToast()">×</button></div>`:'')+
+   `</div><button type="button" class="likeToastView" onclick="openWishlist();hideBookmarkToast()">VIEW ALL WISHLIST</button>`;
+ clearTimeout(window.__likeToast);
+ window.__likeToast=setTimeout(hideBookmarkToast,3400);
+}
+function hideBookmarkToast(){const el=document.getElementById('wishlistToast');if(!el)return;el.classList.remove('show');clearTimeout(window.__likeToast)}
 function updateWishlist(){
  const count=document.getElementById('wishlistCount');
  const box=document.getElementById('wishlistItems');
@@ -475,7 +489,7 @@ function toggleModalWishlist(i,btn){
  if(adding)wishlist.push(name);else wishlist.splice(pos,1);
  persistWishlist(); updateWishlist(); renderProducts();
  if(btn){btn.classList.toggle('liked',adding);btn.textContent=adding?'♥':'♡';btn.setAttribute('aria-label',adding?'Remove from wishlist':'Add to wishlist');}
- showWishlistToast(adding?'SAVED TO WISHLIST':'REMOVED FROM WISHLIST');
+ showBookmarkToast(p,adding?'saved':'removed',i);
 }
 function openProduct(i){
  const p=products[i],z=p[6]||{S:p[5]??20,M:p[5]??20,L:p[5]??20,XL:p[5]??20,XXL:p[5]??20};

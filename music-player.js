@@ -119,6 +119,19 @@
 
   window.ytNavigate=navigate;
 
+  // Admin can change the live song instantly. Rebuild the player immediately
+  // instead of waiting for the 15-second polling interval.
+  window.addEventListener('pintumoujar:music-live-changed',function(e){
+    const m=e.detail||{};
+    if(m.active&&m.videoId){
+      last='';
+      render(m);
+    }else{
+      remove();
+      last='';
+    }
+  });
+
   document.addEventListener('click',function(e){
     if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
     const a=e.target.closest('a[href]');

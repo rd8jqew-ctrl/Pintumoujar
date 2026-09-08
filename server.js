@@ -143,11 +143,39 @@ async function api(req,res,p){
   }
   if(req.method==='GET'&&p.startsWith('/uploads/')){const filename=path.basename(decodeURIComponent(p.slice('/uploads/'.length))),file=path.join(UPLOADS,filename);if(!fs.existsSync(file)||fs.statSync(file).isDirectory())return send(res,404,'Not found','text/plain',origin);return send(res,200,fs.readFileSync(file),mime[path.extname(file).toLowerCase()]||'application/octet-stream',origin)}
 
-  if(req.method==='POST'&&p==='/api/admin/products'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);const image=String(x.image||((x.images||[])[0]||''));if(!String(x.name||'').trim()||priceNumber(x.price)<=0||!image)return send(res,400,{error:'Name, price and image are required'},'application/json',origin);const pr=safeProduct({...x,id:'p_'+crypto.randomBytes(6).toString('hex'),image,sizes:cleanSizes(x.sizes)});db.products.push(pr);audit('product.create',{id:pr.id});await saveAndFlush(db);return send(res,201,pr,'application/json',origin)}
+  if(req.method==='POST'&&p==='/api/admin/products'){
+   if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+   const x=await body(req);
+   let images=Array.isArray(x.images)?x.images.map(String):[];
+   if(x.imageData){
+     const items=Array.isArray(x.imageData)?x.imageData:[x.imageData];
+     for(const item of items){
+       const m=String(item||'').match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
+       if(!m)continue;
+       const mimeType=m[1],buf=Buffer.from(m[2],'base64');
+       if(buf.length>5*1024*1024)return send(res,413,{error:'Image must be 5MB or smaller'},'application/json',origin);
+       const ext=mimeType==='image/jpeg'?'.jpg':mimeType==='image/png'?'.png':'.webp';
+       const filename='product-'+Date.now().toString(36)+'-'+crypto.randomBytes(4).toString('hex')+ext;
+       let url='/uploads/'+encodeURIComponent(filename);
+       try{
+         if(supabaseStore.enabled){
+           const remote=await supabaseStore.uploadMedia(buf,'products/'+filename,mimeType); url=remote.url;
+         }
+       }catch(err){console.warn('[Supabase] product image upload failed, using local copy:',err.message||err)}
+       fs.writeFileSync(path.join(UPLOADS,filename),buf);
+       images.push(url);
+     }
+   }
+   images=images.filter(Boolean);
+   const image=String(x.image||images[0]||'');
+   if(!String(x.name||'').trim()||priceNumber(x.price)<=0||!image)return send(res,400,{error:'Name, price and image are required'},'application/json',origin);
+   const pr=safeProduct({...x,id:'p_'+crypto.randomBytes(6).toString('hex'),image,images,sizes:cleanSizes(x.sizes)});
+   db.products.push(pr);audit('product.create',{id:pr.id});await saveAndFlush(db);return send(res,201,pr,'application/json',origin)
+  }
   if(req.method==='PATCH'&&p.startsWith('/api/admin/products/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/products/'.length)),x=await body(req),i=db.products.findIndex(v=>String(v.id)===id);if(i<0)return send(res,404,{error:'Product not found'},'application/json',origin);const current=db.products[i],merged={...current,...x,id:current.id,image:String(x.image||((Array.isArray(x.images)&&x.images[0])||current.image)),sizes:x.sizes?cleanSizes(x.sizes):cleanSizes(current.sizes)};if(!merged.name||priceNumber(merged.price)<=0||!merged.image)return send(res,400,{error:'Name, price and image are required'},'application/json',origin);db.products[i]=safeProduct(merged);audit('product.update',{id});await saveAndFlush(db);return send(res,200,db.products[i],'application/json',origin)}
   if(req.method==='DELETE'&&p.startsWith('/api/admin/products/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/products/'.length)),i=db.products.findIndex(v=>String(v.id)===id);if(i<0)return send(res,404,{error:'Product not found'},'application/json',origin);db.products.splice(i,1);db.deletedProductIds=Array.isArray(db.deletedProductIds)?db.deletedProductIds:[];if(!db.deletedProductIds.includes(id))db.deletedProductIds.push(id);audit('product.delete',{id});await saveAndFlush(db);return send(res,200,{ok:true},'application/json',origin)}
 
-  if(req.method==='POST'&&p==='/api/admin/coupons'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req),code=String(x.code||'').trim().toUpperCase(),value=Number(x.value||0),minOrder=Math.max(0,Number(x.minOrder||0));if(!/^[A-Z0-9_-]{3,40}$/.test(code)||value<=0||value>100)return send(res,400,{error:'Valid coupon code and discount (1–100%) are required'},'application/json',origin);if(db.coupons.some(c=>String(c.code).toUpperCase()===code))return send(res,409,{error:'Coupon already exists'},'application/json',origin);const c={id:'c_'+crypto.randomBytes(6).toString('hex'),code,type:'percent',value,minOrder,expiresAt:x.expiresAt||null,active:x.active!==false,createdAt:new Date().toISOString()};db.coupons.push(c);audit('coupon.create',{id:c.id});await saveAndFlush(db);return send(res,201,c,'application/json',origin)}
+  if(req.method==='POST'&&(p==='/api/admin/coupons'||p==='/api/admin/vouchers')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req),code=String(x.code||'').trim().toUpperCase(),value=Number(x.value||0),minOrder=Math.max(0,Number(x.minOrder||0));if(!/^[A-Z0-9_-]{3,40}$/.test(code)||value<=0||value>100)return send(res,400,{error:'Valid coupon/voucher code and discount (1–100%) are required'},'application/json',origin);if(db.coupons.some(c=>String(c.code).toUpperCase()===code))return send(res,409,{error:'Coupon already exists'},'application/json',origin);const c={id:'c_'+crypto.randomBytes(6).toString('hex'),code,type:'percent',value,minOrder,expiresAt:x.expiresAt||null,active:x.active!==false,createdAt:new Date().toISOString()};db.coupons.push(c);audit('coupon.create',{id:c.id});await saveAndFlush(db);return send(res,201,c,'application/json',origin)}
   if(req.method==='PATCH'&&p.startsWith('/api/admin/coupons/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/coupons/'.length)),x=await body(req),c=db.coupons.find(v=>v.id===id);if(!c)return send(res,404,{error:'Coupon not found'},'application/json',origin);if(x.code!==undefined)c.code=String(x.code).trim().toUpperCase();if(x.value!==undefined)c.value=Math.min(100,Math.max(0,Number(x.value||0)));if(x.minOrder!==undefined)c.minOrder=Math.max(0,Number(x.minOrder||0));if(x.expiresAt!==undefined)c.expiresAt=x.expiresAt||null;if(x.active!==undefined)c.active=Boolean(x.active);audit('coupon.update',{id});await saveAndFlush(db);return send(res,200,c,'application/json',origin)}
   if(req.method==='DELETE'&&p.startsWith('/api/admin/coupons/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/coupons/'.length)),n=db.coupons.length;db.coupons=db.coupons.filter(v=>v.id!==id);if(n===db.coupons.length)return send(res,404,{error:'Coupon not found'},'application/json',origin);audit('coupon.delete',{id});await saveAndFlush(db);return send(res,200,{ok:true},'application/json',origin)}
 

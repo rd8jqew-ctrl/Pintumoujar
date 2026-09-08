@@ -267,7 +267,7 @@ button:active,.btn:active,.yt-quick-card:active{transform:scale(.97)!important}
 .music-live-video-shell{margin-top:2px;border:1px solid rgba(126,96,255,.25);border-radius:20px;overflow:hidden;background:linear-gradient(145deg,rgba(7,8,25,.98),rgba(18,10,42,.96));box-shadow:0 20px 55px #0009}.music-live-video{position:relative;aspect-ratio:16/9;min-height:250px;background:#000;overflow:hidden}.music-live-video iframe{display:block;width:100%;height:100%;border:0}.music-video-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#777b99;background:radial-gradient(circle at 50% 35%,rgba(113,54,255,.22),transparent 40%),#070817}.music-video-placeholder-icon{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#6631ff,#a855f7);color:#fff;font-size:28px;box-shadow:0 0 35px rgba(124,60,255,.45)}.music-video-placeholder b{color:#fff;font-size:18px}.music-video-placeholder span{font-size:11px}.music-video-caption{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 15px;background:linear-gradient(90deg,rgba(17,13,43,.98),rgba(9,11,30,.98));border-top:1px solid rgba(126,96,255,.16)}.music-video-caption-main{min-width:0}.music-video-caption-main h3{font-size:19px;margin:6px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.music-video-caption-main p{color:#999cb7;margin:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.music-video-shell{position:relative}.music-youtube-shield{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(4,6,18,.12),rgba(4,6,18,.52));cursor:pointer}.music-youtube-shield.is-hidden{display:none}.music-youtube-shield-card{display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;padding:10px 14px;border-radius:14px;background:rgba(8,10,24,.76);border:1px solid rgba(168,85,247,.45);backdrop-filter:blur(10px);box-shadow:0 12px 35px rgba(0,0,0,.35)}.music-youtube-shield-play{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#6d20ff,#a855f7);color:#fff;font-size:20px;box-shadow:0 0 28px rgba(124,44,255,.45)}.music-youtube-shield-title{max-width:260px;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.music-youtube-shield-hint{font-size:9px;color:#b6adc9}.music-video-box iframe{position:relative;z-index:1}.music-video-caption-actions{display:flex;gap:8px;flex:none}.music-preview-mode{border-color:rgba(255,193,7,.25)}@media(max-width:699px){.music-live-video{min-height:0}.music-video-caption{align-items:flex-start;flex-direction:column}.music-video-caption-actions{width:100%}.music-video-caption-actions .music-btn{flex:1}.music-video-caption-main h3{font-size:16px}}
 </style></head>
 <body>
-<header><div class="logo">YOUR TYPE</div><div><button class="btn" onclick="window.ytGoStore ? window.ytGoStore() : (window.location.href='/')">Store</button> <button class="btn primary" onclick="adminLogin()">Admin</button></div></header>
+<header><div class="logo">YOUR TYPE</div><div><button type="button" class="btn" id="ytStoreButton" onclick="event.preventDefault();event.stopPropagation();if(window.ytGoStore)window.ytGoStore();else window.location.assign('/');return false">Store</button> <button class="btn primary" onclick="adminLogin()">Admin</button></div></header>
 <div class="wrap">
 
 <section id="store" class="section on">
@@ -1404,11 +1404,12 @@ async function restoreServerBackup(){
   let ytAdminPlayer=null;
   let ytAdminApiPromise=null;
   let ytAdminResumeTimer=null;
-  const MUSIC_RESUME_KEY='pintumoujar_music_resume_v2';
+  const MUSIC_RESUME_KEY='pintumoujar_music_resume_v4';
+  const MUSIC_SEARCH_CACHE='pintumoujar_music_search_v1';
   function mEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function mHeaders(){const t=(typeof getAdminToken==='function'?getAdminToken():(sessionStorage.getItem('adminToken')||''));return t?{'Content-Type':'application/json','Authorization':'Bearer '+t}:{'Content-Type':'application/json'}}
   async function mApi(url,opt={}){const r=await fetch(url,Object.assign({},opt,{headers:Object.assign(mHeaders(),opt.headers||{})}));let d={};try{d=await r.json()}catch(_){}if(!r.ok)throw new Error(d.error||('Request failed ('+r.status+')'));return d}
-  function musicResumeGet(){try{return JSON.parse(sessionStorage.getItem(MUSIC_RESUME_KEY)||'null')}catch(_){return null}}
+  function musicResumeGet(){try{return JSON.parse(localStorage.getItem(MUSIC_RESUME_KEY)||'null')}catch(_){return null}}
   function musicResumeSave(){
     try{
       if(!ytAdminPlayer||!ytAdminPlayer.getCurrentTime)return;
@@ -1416,8 +1417,18 @@ async function restoreServerBackup(){
       const videoId=String(box?.dataset.videoId||''); if(!videoId)return;
       const time=Number(ytAdminPlayer.getCurrentTime()||0); if(!Number.isFinite(time))return;
       const state=ytAdminPlayer.getPlayerState?.();
-      sessionStorage.setItem(MUSIC_RESUME_KEY,JSON.stringify({videoId,time,playing:state===1,updatedAt:Date.now()}));
+      localStorage.setItem(MUSIC_RESUME_KEY,JSON.stringify({videoId,time,playing:state===1,updatedAt:Date.now()}));
+      window.dispatchEvent(new CustomEvent('pintumoujar:admin-music-state',{detail:{videoId,time,playing:state===1}}));
     }catch(_){}
+  }
+  function musicSearchCacheGet(){try{return JSON.parse(localStorage.getItem(MUSIC_SEARCH_CACHE)||'null')}catch(_){return null}}
+  function musicSearchCacheSet(q,items){try{localStorage.setItem(MUSIC_SEARCH_CACHE,JSON.stringify({q:String(q||''),items:Array.isArray(items)?items.slice(0,12):[],updatedAt:Date.now()}))}catch(_){} }
+  function renderMusicResults(items){
+    const box=document.getElementById('musicResults'); if(!box)return;
+    const arr=Array.isArray(items)?items:[];
+    document.getElementById('musicResultCount').textContent=arr.length+' results';
+    if(!arr.length){box.innerHTML='<div class="music-empty">Search a song or artist to load YouTube results.</div>';return}
+    box.innerHTML=arr.map(x=>`<div class="music-result" role="button" tabindex="0" data-video-id="${mEsc(x.videoId)}" onclick='ytMusicPreview(${JSON.stringify(x)})' onkeydown="if(event.key==='Enter'||event.key===' ')ytMusicPreview(${JSON.stringify(x)})"><img src="${mEsc(x.thumbnail)}" alt=""><div><h4 title="${mEsc(x.title)}">${mEsc(x.title)}</h4><p>${mEsc(x.channel)}</p><div style="display:flex;gap:8px;align-items:center;margin-top:7px"><button type="button" onclick="event.preventDefault();event.stopPropagation();ytMusicPreview(${JSON.stringify(x)})">▶ Play Here</button><button type="button" onclick="event.preventDefault();event.stopPropagation();ytMusicSet(${JSON.stringify(x)})">Set Live</button></div></div></div>`).join('');
   }
   function musicYTApi(){
     if(window.YT&&window.YT.Player)return Promise.resolve(window.YT);
@@ -1450,6 +1461,7 @@ async function restoreServerBackup(){
             if(ev.data===YT.PlayerState.PLAYING||ev.data===YT.PlayerState.PAUSED||ev.data===YT.PlayerState.ENDED)musicResumeSave();
           }
         }});
+        window.__PINTUMOUJAR_ACTIVE_YT_PLAYER__=ytAdminPlayer;
         if(ytAdminResumeTimer)clearInterval(ytAdminResumeTimer);
         ytAdminResumeTimer=setInterval(musicResumeSave,700);
       }catch(_){}
@@ -1458,6 +1470,7 @@ async function restoreServerBackup(){
   function destroyAdminYT(){
     musicResumeSave();
     try{if(ytAdminPlayer?.destroy)ytAdminPlayer.destroy()}catch(_){}
+    if(window.__PINTUMOUJAR_ACTIVE_YT_PLAYER__===ytAdminPlayer)window.__PINTUMOUJAR_ACTIVE_YT_PLAYER__=null;
     ytAdminPlayer=null;
     if(ytAdminResumeTimer){clearInterval(ytAdminResumeTimer);ytAdminResumeTimer=null;}
   }
@@ -1481,8 +1494,8 @@ async function restoreServerBackup(){
     const gen=++playerGeneration;
     const resume=musicResumeGet();
     const start=(resume&&resume.videoId===id&&Number(resume.time)>1)?Math.floor(Number(resume.time)):0;
-    const src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1'+(start?'&start='+start:'');
-    box.innerHTML='<iframe src="'+src+'" title="'+title+'" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe><div class="music-youtube-shield" id="musicYoutubeShield" role="button" aria-label="Play this song here"><div class="music-youtube-shield-card"><div class="music-youtube-shield-play">▶</div><div class="music-youtube-shield-title">'+title+'</div><div class="music-youtube-shield-hint">Tap to play here — YouTube par nahi jayega</div></div></div>';
+    const src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&controls=0'+(start?'&start='+start:'');
+    box.innerHTML='<iframe style="pointer-events:none" src="'+src+'" title="'+title+'" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe><div class="music-youtube-shield" id="musicYoutubeShield" role="button" aria-label="Play this song here"><div class="music-youtube-shield-card"><div class="music-youtube-shield-play">▶</div><div class="music-youtube-shield-title">'+title+'</div><div class="music-youtube-shield-hint">Tap to play here — YouTube par nahi jayega</div></div></div>';
     box.dataset.videoId=id;
     const frame=box.querySelector('iframe');
     const shield=box.querySelector('#musicYoutubeShield');
@@ -1494,7 +1507,7 @@ async function restoreServerBackup(){
     return gen;
   }
   window.ytMusicTab=function(tab,btn){document.querySelectorAll('.music-tab').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');document.getElementById('musicSearchPanel').style.display=tab==='search'?'block':'none';document.getElementById('musicManualPanel').style.display=tab==='manual'?'block':'none'};
-  window.ytMusicSearch=async function(){const q=(document.getElementById('musicSearch')?.value||'').trim();if(q.length<2){toast('Search at least 2 characters');return}const box=document.getElementById('musicResults');box.innerHTML='<div class="music-empty">Searching YouTube…</div>';try{const d=await mApi('/api/admin/youtube/search?q='+encodeURIComponent(q));document.getElementById('musicResultCount').textContent=(d.items||[]).length+' results';if(!d.items?.length){box.innerHTML='<div class="music-empty">No YouTube results found.</div>';return}box.innerHTML=d.items.map(x=>`<div class="music-result" role="button" tabindex="0" onclick='ytMusicPreview(${JSON.stringify(x)})' onkeydown="if(event.key==='Enter'||event.key===' ')ytMusicPreview(${JSON.stringify(x)})"><img src="${mEsc(x.thumbnail)}" alt=""><div><h4 title="${mEsc(x.title)}">${mEsc(x.title)}</h4><p>${mEsc(x.channel)}</p><div style="display:flex;gap:8px;align-items:center;margin-top:7px"><button type="button" onclick="event.stopPropagation();ytMusicPreview(${JSON.stringify(x)})">▶ Play Here</button><button type="button" onclick="event.stopPropagation();ytMusicSet(${JSON.stringify(x)});return false">Set Live</button></div></div></div>`).join('')}catch(e){box.innerHTML='<div class="music-empty">'+mEsc(e.message)+'</div>'}};
+  window.ytMusicSearch=async function(){const q=(document.getElementById('musicSearch')?.value||'').trim();if(q.length<2){toast('Search at least 2 characters');return}const box=document.getElementById('musicResults');box.innerHTML='<div class="music-empty">Searching YouTube…</div>';try{const d=await mApi('/api/admin/youtube/search?q='+encodeURIComponent(q));const items=d.items||[];musicSearchCacheSet(q,items);renderMusicResults(items)}catch(e){box.innerHTML='<div class="music-empty">'+mEsc(e.message)+'</div>'}};
   window.ytMusicPreview=function(x){
     if(!x?.videoId){toast('Video unavailable');return}
     previewMusic=x;
@@ -1528,7 +1541,7 @@ async function restoreServerBackup(){
       if(!existing || existing.src.indexOf('/'+encodeURIComponent(String(m.videoId)))<0){playInline(m,'live')}
     }else{stopInlinePlayer()}
   };
-  window.ytMusicLoad=async function(){try{const d=await mApi('/api/admin/music/current');ytMusicRender(d.music||{})}catch(e){console.warn('Music load failed',e)}};
+  window.ytMusicLoad=async function(){try{const d=await mApi('/api/admin/music/current');ytMusicRender(d.music||{});const cached=musicSearchCacheGet();if(cached?.q){const inp=document.getElementById('musicSearch');if(inp)inp.value=cached.q;renderMusicResults(cached.items||[])}}catch(e){console.warn('Music load failed',e)}};
   window.addEventListener('load',()=>setTimeout(()=>{if(document.getElementById('music'))ytMusicLoad()},500));
   window.addEventListener('pagehide',musicResumeSave);
   window.addEventListener('beforeunload',musicResumeSave);

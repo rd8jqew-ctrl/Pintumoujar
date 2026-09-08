@@ -4,7 +4,8 @@
 
   const ADMIN_PATH = location.pathname.endsWith('/admin.html') || location.pathname === '/admin';
   const PLAYER_ID='ytLiveMusic';
-  const RESUME_KEY='pintumoujar_music_resume_v3';
+  const RESUME_KEY='pintumoujar_music_resume_v4';
+  const SEARCH_KEY='pintumoujar_music_search_v1';
   let last='';
   let ytPlayer=null;
   let ytApiPromise=null;
@@ -12,7 +13,9 @@
   let routing=false;
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function getResume(){try{return JSON.parse(sessionStorage.getItem(RESUME_KEY)||'null')}catch(_){return null}}
+  function getResume(){try{return JSON.parse(localStorage.getItem(RESUME_KEY)||'null')}catch(_){return null}}
+  function cacheGet(){try{return JSON.parse(localStorage.getItem(SEARCH_KEY)||'null')}catch(_){return null}}
+  function cacheSet(q,items){try{localStorage.setItem(SEARCH_KEY,JSON.stringify({q:String(q||''),items:Array.isArray(items)?items.slice(0,12):[],updatedAt:Date.now()}))}catch(_){} }
   function saveResume(){
     try{
       if(!ytPlayer?.getCurrentTime)return;
@@ -21,7 +24,7 @@
       const time=Number(ytPlayer.getCurrentTime()||0);
       if(!Number.isFinite(time))return;
       const state=ytPlayer.getPlayerState?.();
-      sessionStorage.setItem(RESUME_KEY,JSON.stringify({videoId,time,playing:state===1,updatedAt:Date.now()}));
+      localStorage.setItem(RESUME_KEY,JSON.stringify({videoId,time,playing:state===1,updatedAt:Date.now()}));
     }catch(_){ }
   }
   function loadYTApi(){
@@ -71,7 +74,7 @@
     const btn=el.querySelector('.ytm-overlay-play');
     const hint=el.querySelector('.ytm-overlay-hint');
     let state=-1; try{state=ytPlayer?.getPlayerState?.()??-1}catch(_){ }
-    if(btn){const icon=btn.querySelector('.ytm-play-icon'); if(icon)icon.textContent=state===1?'❚❚':'▶'; const label=btn.querySelector('.ytm-play-label'); if(label)label.textContent=state===1?'Playing':'Listen Live';}
+    if(btn)btn.textContent=state===1?'❚❚':'▶';
     if(hint)hint.textContent=state===1?'Playing here':'Tap to play here';
   }
 
@@ -79,9 +82,16 @@
     const el=document.createElement('div');
     el.id=PLAYER_ID;
     el.dataset.videoId=String(m.videoId||'');
-    el.innerHTML='<div class="ytm-inner"><img class="ytm-art" src="'+esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))+'" alt="'+esc(m.title||'Live Music')+'"><div><div class="ytm-title">'+esc(m.title||'Live Music')+'</div><div class="ytm-channel">'+esc(m.channel||'YouTube')+' · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play live music"><span class="ytm-play-icon">▶</span><span class="ytm-play-label">Listen Live</span></button><button class="ytm-expand" aria-label="Show video">↗</button></div></div><div class="ytm-frame"></div><div class="ytm-overlay" aria-label="Play music here"><div class="ytm-overlay-card"><button class="ytm-overlay-play" type="button">▶</button><b>'+esc(m.title||'Live Music')+'</b><span class="ytm-overlay-hint">Tap to listen to the live song here</span></div></div>';
+    el.innerHTML='<div class="ytm-inner"><img class="ytm-art" src="'+esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))+'" alt="'+esc(m.title||'Live Music')+'"><div><div class="ytm-title">'+esc(m.title||'Live Music')+'</div><div class="ytm-channel">'+esc(m.channel||'YouTube')+' · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play or pause">▶</button><button class="ytm-expand" aria-label="Show video">↗</button></div></div><div class="ytm-frame"></div><div class="ytm-overlay" aria-label="Play music here"><div class="ytm-overlay-card"><button class="ytm-overlay-play" type="button">▶</button><b>'+esc(m.title||'Live Music')+'</b><span class="ytm-overlay-hint">Tap to play here</span></div></div>';
+    iframe.style.pointerEvents='none';
+    iframe.setAttribute('aria-hidden','true');
     el.querySelector('.ytm-frame').appendChild(iframe);
     document.documentElement.appendChild(el);
+    if(window.__PINTUMOUJAR_ACTIVE_YT_PLAYER__){
+      ytPlayer=window.__PINTUMOUJAR_ACTIVE_YT_PLAYER__;
+      if(resumeTimer)clearInterval(resumeTimer);
+      resumeTimer=setInterval(saveResume,800);
+    }
     const toggle=()=>{try{if(ytPlayer?.getPlayerState?.()===1)ytPlayer.pauseVideo();else ytPlayer?.playVideo()}catch(_){} updateOverlay()};
     el.querySelector('.ytm-play').onclick=toggle;
     el.querySelector('.ytm-overlay').onclick=e=>{e.preventDefault();e.stopPropagation();toggle()};
@@ -103,7 +113,7 @@
     const iframe=document.createElement('iframe');
     const r=getResume();
     const start=(r?.videoId===String(m.videoId)&&Number(r.time)>1)?Math.floor(Number(r.time)):0;
-    iframe.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(m.videoId)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&controls=1'+(start?'&start='+start:'');
+    iframe.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(m.videoId)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&controls=0'+(start?'&start='+start:'');
     iframe.title=m.title||'Live Music';
     iframe.allow='autoplay; encrypted-media; picture-in-picture; web-share';
     iframe.allowFullscreen=true;
@@ -132,7 +142,9 @@
     if(!frame)return false;
     const videoId=String(document.querySelector('#musicLiveVideoBox')?.dataset.videoId||'');
     const meta={videoId,title:document.getElementById('musicLiveTitle')?.textContent||'Live Music',channel:document.getElementById('musicLiveChannel')?.textContent?.replace(/\s*·.*$/,'')||'YouTube',thumbnail:videoId?'https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg':''};
+    const state=window.__PINTUMOUJAR_ADMIN_YT_STATE__||{};
     const shell=makePlayerShell(meta,frame);
+    if(state.time!=null){try{localStorage.setItem(RESUME_KEY,JSON.stringify({videoId,time:Number(state.time)||0,playing:state.playing!==false,updatedAt:Date.now()}))}catch(_){} }
     window.__PINTUMOUJAR_TRANSFER_VIDEO__=videoId;
     // The admin YT.Player instance remains attached to the moved iframe.
     // Do not call destroyAdminYT here.
@@ -173,7 +185,7 @@
     try{
       if(ADMIN_PATH || location.pathname.endsWith('/admin.html') || location.pathname==='/admin')preserveAdminIframe();
       const r=await fetch(target.href,{cache:'no-store',headers:{'X-PINTUMOUJAR-SPA':'1'}});
-      if(!r.ok){location.href=target.href;return}
+      if(!r.ok){location.assign(target.href);return}
       const html=await r.text();
       const doc=new DOMParser().parseFromString(html,'text/html');
       cleanHead(doc);
@@ -201,6 +213,7 @@
     e.preventDefault();navigate(u.href,true);
   },true);
   window.addEventListener('popstate',()=>navigate(location.href,false));
+  window.addEventListener('pintumoujar:admin-music-state',e=>{window.__PINTUMOUJAR_ADMIN_YT_STATE__=e.detail||{};saveResume();});
   window.addEventListener('pagehide',saveResume);
   window.addEventListener('beforeunload',saveResume);
   window.addEventListener('pintumoujar:music-live-changed',e=>{if(!ADMIN_PATH){last='';if(e.detail?.active&&e.detail.videoId)renderPublic(e.detail);else removePublicPlayer()}});

@@ -1,0 +1,19 @@
+PINTUMOUJAR V12 MUSIC FIXES
+
+1. YouTube redirect protection:
+   - Embedded YouTube iframe is non-clickable.
+   - Site overlay/custom controls handle play/pause so taps do not open YouTube.
+
+2. Persistent music across Admin -> Store and internal website navigation:
+   - Admin music iframe can be transferred to the storefront without destroying it.
+   - Playback position is stored in localStorage and restored after page refresh.
+
+3. Admin music state survives refresh:
+   - Current live song remains loaded from the server.
+   - Last YouTube search query/results are cached locally and restored, so you do not need to search again after refresh.
+
+4. Visitor music:
+   - Public pages keep the live music player.
+   - Autoplay is attempted, but browsers can still require the visitor to tap Listen/Play.
+
+5. Double playback prevention remains enabled.

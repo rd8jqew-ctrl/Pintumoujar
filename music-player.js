@@ -71,7 +71,7 @@
     const btn=el.querySelector('.ytm-overlay-play');
     const hint=el.querySelector('.ytm-overlay-hint');
     let state=-1; try{state=ytPlayer?.getPlayerState?.()??-1}catch(_){ }
-    if(btn)btn.textContent=state===1?'❚❚':'▶';
+    if(btn){const icon=btn.querySelector('.ytm-play-icon'); if(icon)icon.textContent=state===1?'❚❚':'▶'; const label=btn.querySelector('.ytm-play-label'); if(label)label.textContent=state===1?'Playing':'Listen Live';}
     if(hint)hint.textContent=state===1?'Playing here':'Tap to play here';
   }
 
@@ -79,7 +79,7 @@
     const el=document.createElement('div');
     el.id=PLAYER_ID;
     el.dataset.videoId=String(m.videoId||'');
-    el.innerHTML='<div class="ytm-inner"><img class="ytm-art" src="'+esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))+'" alt="'+esc(m.title||'Live Music')+'"><div><div class="ytm-title">'+esc(m.title||'Live Music')+'</div><div class="ytm-channel">'+esc(m.channel||'YouTube')+' · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play or pause">▶</button><button class="ytm-expand" aria-label="Show video">↗</button></div></div><div class="ytm-frame"></div><div class="ytm-overlay" aria-label="Play music here"><div class="ytm-overlay-card"><button class="ytm-overlay-play" type="button">▶</button><b>'+esc(m.title||'Live Music')+'</b><span class="ytm-overlay-hint">Tap to play here</span></div></div>';
+    el.innerHTML='<div class="ytm-inner"><img class="ytm-art" src="'+esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))+'" alt="'+esc(m.title||'Live Music')+'"><div><div class="ytm-title">'+esc(m.title||'Live Music')+'</div><div class="ytm-channel">'+esc(m.channel||'YouTube')+' · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play live music"><span class="ytm-play-icon">▶</span><span class="ytm-play-label">Listen Live</span></button><button class="ytm-expand" aria-label="Show video">↗</button></div></div><div class="ytm-frame"></div><div class="ytm-overlay" aria-label="Play music here"><div class="ytm-overlay-card"><button class="ytm-overlay-play" type="button">▶</button><b>'+esc(m.title||'Live Music')+'</b><span class="ytm-overlay-hint">Tap to listen to the live song here</span></div></div>';
     el.querySelector('.ytm-frame').appendChild(iframe);
     document.documentElement.appendChild(el);
     const toggle=()=>{try{if(ytPlayer?.getPlayerState?.()===1)ytPlayer.pauseVideo();else ytPlayer?.playVideo()}catch(_){} updateOverlay()};

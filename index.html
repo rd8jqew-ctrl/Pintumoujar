@@ -389,10 +389,20 @@ function updateWishlist(){
    const p=products[i];
    return `<article class="wishlistItem" role="button" tabindex="0" onclick="openProduct(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openProduct(${i})}">
      <div class="wishlistThumb"><img src="${productImage(p[2])}" alt="${esc(p[0])}" loading="lazy" draggable="false" onerror="this.style.visibility='hidden'"></div>
-     <div class="wishlistInfo"><span class="wishlistEyebrow">SAVED PIECE</span><b>${esc(p[0])}</b><span class="wishlistPrice">${esc(p[1])}</span><span class="wishlistHint">TAP TO VIEW</span></div>
+     <div class="wishlistInfo"><span class="wishlistEyebrow">SAVED PIECE</span><b>${esc(p[0])}</b><span class="wishlistPrice">${esc(p[1])}</span><div class="wishlistActions"><button class="wishlistAdd" type="button" onclick="event.preventDefault();event.stopPropagation();addWishlistToBag(${i},this)">ADD TO BAG +</button><span class="wishlistHint">TAP TO VIEW</span></div></div>
      <button class="wishlistRemove" type="button" aria-label="Remove ${esc(p[0])} from wishlist" onclick="event.stopPropagation();removeWishlistByIndex(${i})">×</button>
    </article>`
  }).join(''):'<div class="wishlistEmpty"><strong>YOUR WISHLIST IS EMPTY</strong><span>Save pieces you want to come back to.</span></div>';
+}
+function addWishlistToBag(i,btn){
+ const p=products[i]; if(!p)return;
+ const z=p[6]||{S:p[5]??20,M:p[5]??20,L:p[5]??20,XL:p[5]??20,XXL:p[5]??20};
+ const size=['S','M','L','XL','XXL'].find(sz=>Number(z[sz]||0)>0);
+ if(!size){showWishlistToast('SOLD OUT');return;}
+ cart.push({...p,size,color:'Black',qty:1});
+ saveCart();
+ if(btn){const old=btn.textContent;btn.textContent='ADDED ✓';btn.disabled=true;setTimeout(()=>{btn.textContent=old;btn.disabled=false},700);}
+ showWishlistToast('ADDED TO BAG');
 }
 function removeWishlistByIndex(i){const p=products[i];if(!p)return;removeWishlist(wishlistKey(p));showWishlistToast('REMOVED FROM WISHLIST')}
 function removeWishlist(name){wishlist=wishlist.filter(x=>x!==name);persistWishlist();updateWishlist();renderProducts()}

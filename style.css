@@ -753,6 +753,7 @@ body.light .curatedSection,body.light .trendSection,body.light .highlightsSectio
 .wishlistInfo b{font-size:12px;letter-spacing:.3px;color:#eee;line-height:1.35}
 .wishlistPrice{font-size:11px;color:#aaa}
 .wishlistHint{font-size:7px;letter-spacing:1.8px;color:#555;margin-top:4px}
+.wishlistActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.wishlistAdd{border:1px solid #333;border-radius:999px;background:#f1f1f1;color:#111;padding:7px 9px;font-size:7px;letter-spacing:1.2px;font-weight:700;cursor:pointer;touch-action:manipulation}.wishlistAdd:hover{background:#fff}.wishlistAdd:disabled{opacity:.6;cursor:default}
 .wishlistRemove{width:32px;height:32px;border:1px solid #2b2b2b;border-radius:50%;background:transparent;color:#999;font-size:19px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
 .wishlistRemove:hover{color:#fff;border-color:#555}
 .wishlistEmpty{padding:42px 18px;text-align:center;border:1px dashed #292929;border-radius:18px;display:flex;flex-direction:column;gap:9px;color:#777}

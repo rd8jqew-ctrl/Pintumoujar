@@ -5,3 +5,6 @@ Set this server environment variable in your hosting dashboard (Render/local env
 YOUTUBE_API_KEY=YOUR_KEY_HERE
 
 The Live Music admin page uses the server-side key for YouTube search. Manual YouTube links also work without the key.
+
+
+IMAGE FIX: Live song artwork is now taken automatically from YouTube (oEmbed/thumbnail). Manual YouTube links also get title, channel and thumbnail without requiring the search API key.

@@ -69,6 +69,24 @@ function normalizeImageRef(v){const s=String(v||'').trim();if(!s)return '';if(/^
 function safeProduct(p){const sizes=cleanSizes(p.sizes),images=(Array.isArray(p.images)?p.images:[]).map(normalizeImageRef).filter(Boolean),image=normalizeImageRef(p.image||images[0]||'');return {id:String(p.id),name:String(p.name||''),price:String(p.price||''),image,images:images.length?images:(image?[image]:[]),badge:String(p.badge||''),oldPrice:String(p.oldPrice||''),description:String(p.description||''),category:String(p.category||'T-Shirts'),sku:String(p.sku||''),cost:Number(p.cost||0),sizes,colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],active:p.active!==false,featured:Boolean(p.featured),sections:Array.isArray(p.sections)?p.sections:[],stock:Object.values(sizes).reduce((a,b)=>a+b,0)}}
 function audit(action,meta={}){db.audit.unshift({id:crypto.randomUUID(),action,meta,time:new Date().toISOString()});db.audit=db.audit.slice(0,500)}
 function findProduct(item){const id=String(item.productId||'');if(id){const p=db.products.find(v=>String(v.id)===id);if(p)return p}const sku=String(item.sku||'');if(sku){const p=db.products.find(v=>String(v.sku)===sku);if(p)return p}const name=String(item.name||'');const image=String(item.image||'');return db.products.find(v=>v.name===name&&( !image || v.image===image))}
+function youtubeThumb(videoId){return 'https://i.ytimg.com/vi/'+encodeURIComponent(videoId)+'/hqdefault.jpg'}
+async function enrichYouTubeMusic(videoId,x){
+  const fallbackThumb=youtubeThumb(videoId);
+  let title=String(x.title||'').trim();
+  let channel=String(x.channel||'').trim();
+  let thumbnail=String(x.thumbnail||'').trim();
+  let duration=String(x.duration||'').trim();
+  if(!thumbnail || /\/vi\/(?:0|undefined)\//.test(thumbnail)) thumbnail=fallbackThumb;
+  if(title==='YouTube Live Song' || !thumbnail || !channel){
+    try{
+      const u='https://www.youtube.com/oembed?url='+encodeURIComponent('https://www.youtube.com/watch?v='+videoId)+'&format=json';
+      const rr=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0'}});
+      if(rr.ok){const d=await rr.json(); title=title==='YouTube Live Song'||!title?String(d.title||title||'YouTube Music'):title; channel=!channel?String(d.author_name||'YouTube'):channel; thumbnail=String(d.thumbnail_url||thumbnail||fallbackThumb)}
+    }catch(_){ }
+  }
+  return {title:title||'YouTube Music',channel:channel||'YouTube',thumbnail:thumbnail||fallbackThumb,duration};
+}
+
 
 async function api(req,res,p){
  const origin=originFor(req);
@@ -118,7 +136,8 @@ async function api(req,res,p){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
     const x=await body(req),videoId=String(x.videoId||'').trim().replace(/^.*(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{6,})?.*$/,'$1');
     if(!/^[A-Za-z0-9_-]{6,20}$/.test(videoId))return send(res,400,{error:'Valid YouTube video ID is required'},'application/json',origin);
-    db.music={active:true,videoId,title:String(x.title||'YouTube Music'),channel:String(x.channel||''),thumbnail:String(x.thumbnail||('https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg')),duration:String(x.duration||''),updatedAt:new Date().toISOString()};
+    const meta=await enrichYouTubeMusic(videoId,x);
+    db.music={active:true,videoId,title:meta.title,channel:meta.channel,thumbnail:meta.thumbnail,duration:meta.duration,updatedAt:new Date().toISOString()};
     audit('music.set-live',{videoId}); await saveAndFlush(db);
     return send(res,200,{ok:true,music:db.music},'application/json',origin);
   }

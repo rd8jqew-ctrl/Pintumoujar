@@ -13,6 +13,7 @@ const ADMIN_AUTH_FILE=path.join(ROOT,'admin-auth.json');
 const ADMIN_USER=process.env.ADMIN_USER||'admin';
 const ADMIN_PASS=process.env.ADMIN_PASS||'';
 const ADMIN_RESET_TOKEN=process.env.ADMIN_RESET_TOKEN||'';
+const YOUTUBE_API_KEY=process.env.YOUTUBE_API_KEY||'';
 const STATUSES=['New','Processing','Confirmed','Packed','Shipped','Out for Delivery','Delivered','Cancelled'];
 const SIZES=['S','M','L','XL','XXL'];
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.mp4':'video/mp4','.txt':'text/plain; charset=utf-8'};
@@ -41,6 +42,7 @@ async function saveAndFlush(db){
 const db=load();
 db.orders ||= []; db.newsletter ||= []; db.users ||= []; db.products ||= []; db.sessions ||= {}; db.reviews ||= []; db.coupons ||= []; db.returns ||= []; db.notifications ||= []; db.audit ||= [];
 db.settings ||= {gst:5,shipping:99,freeShipping:1999};
+db.music ||= {active:false,videoId:'',title:'',channel:'',thumbnail:'',duration:'',updatedAt:null};
 db.site ||= {hero:'YOUR TYPE',announcement:'New drops every week',sections:{home:true,collections:true,motion:true,featured:true,bestSellers:true,newCollection:true,trending:true,womenTops:true,highlights:true,editorial:true,newsletter:true},sectionProducts:{},colorPalette:['Black','White','Charcoal','Red','Blue','Green']};
 db.site.sections ||= {home:true,collections:true,motion:true,featured:true,bestSellers:true,newCollection:true,trending:true,womenTops:true,highlights:true,editorial:true,newsletter:true};
 db.site.sectionProducts ||= {}; db.site.colorPalette ||= ['Black','White','Charcoal','Red','Blue','Green'];
@@ -53,7 +55,7 @@ db.products=db.products.filter(p=>!localDeletedProductIds.has(String(p.id)));
 
 function hash(s){return crypto.createHash('sha256').update(String(s)).digest('hex')}
 function originFor(req){const o=req.headers.origin||'';return o&&o===('http://'+req.headers.host)?o:''}
-function send(res,status,data,type='application/json',origin=''){const h={'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN','Referrer-Policy':'strict-origin-when-cross-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:",'Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,PATCH,DELETE,OPTIONS'};if(origin)h['Access-Control-Allow-Origin']=origin;res.writeHead(status,h);res.end(type==='application/json'?JSON.stringify(data):data)}
+function send(res,status,data,type='application/json',origin=''){const h={'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN','Referrer-Policy':'strict-origin-when-cross-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.googleapis.com",'Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,PATCH,DELETE,OPTIONS'};if(origin)h['Access-Control-Allow-Origin']=origin;res.writeHead(status,h);res.end(type==='application/json'?JSON.stringify(data):data)}
 const rate=new Map();
 function limited(req,key,limit=60,windowMs=60000){const now=Date.now();const forwarded=String(req.headers['x-forwarded-for']||'').split(',')[0].trim();const ip=forwarded||req.socket.remoteAddress||'local';const k=key+'|'+ip;const arr=(rate.get(k)||[]).filter(t=>now-t<windowMs);arr.push(now);rate.set(k,arr);return arr.length>limit}
 function body(req){return new Promise((resolve,reject)=>{let b='';req.on('data',c=>{b+=c;if(b.length>45e6){req.destroy();reject(new Error('Payload too large'))}});req.on('end',()=>{try{resolve(b?JSON.parse(b):{})}catch(e){reject(e)}});req.on('error',reject)})}
@@ -104,7 +106,40 @@ async function api(req,res,p){
   }
   if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items},'application/json',origin)}
 
-  if(req.method==='GET'&&p==='/api/admin/data'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);return send(res,200,{orders:db.orders,newsletter:db.newsletter,products:db.products.map(safeProduct),users:db.users.map(u=>({id:u.id,name:u.name,email:u.email,phone:u.phone||'',createdAt:u.createdAt})),reviews:db.reviews,coupons:db.coupons,returns:db.returns,notifications:db.notifications,audit:db.audit,settings:db.settings,site:db.site},'application/json',origin)}
+  if(req.method==='GET'&&p==='/api/music/current'){
+    const m=db.music||{};
+    return send(res,200,{active:Boolean(m.active),videoId:String(m.videoId||''),title:String(m.title||''),channel:String(m.channel||''),thumbnail:String(m.thumbnail||''),duration:String(m.duration||''),updatedAt:m.updatedAt||null},'application/json',origin);
+  }
+  if(req.method==='GET'&&p==='/api/admin/music/current'){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    return send(res,200,{music:db.music||{}},'application/json',origin);
+  }
+  if(req.method==='PUT'&&p==='/api/admin/music/current'){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    const x=await body(req),videoId=String(x.videoId||'').trim().replace(/^.*(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{6,})?.*$/,'$1');
+    if(!/^[A-Za-z0-9_-]{6,20}$/.test(videoId))return send(res,400,{error:'Valid YouTube video ID is required'},'application/json',origin);
+    db.music={active:true,videoId,title:String(x.title||'YouTube Music'),channel:String(x.channel||''),thumbnail:String(x.thumbnail||('https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg')),duration:String(x.duration||''),updatedAt:new Date().toISOString()};
+    audit('music.set-live',{videoId}); await saveAndFlush(db);
+    return send(res,200,{ok:true,music:db.music},'application/json',origin);
+  }
+  if(req.method==='DELETE'&&p==='/api/admin/music/current'){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    db.music={...(db.music||{}),active:false,updatedAt:new Date().toISOString()};
+    audit('music.stop'); await saveAndFlush(db);
+    return send(res,200,{ok:true,music:db.music},'application/json',origin);
+  }
+  if(req.method==='GET'&&p==='/api/admin/youtube/search'){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    if(!YOUTUBE_API_KEY)return send(res,503,{error:'YouTube API key is not configured. Set YOUTUBE_API_KEY on the server.'},'application/json',origin);
+    const q=String(new URL(req.url,'http://localhost').searchParams.get('q')||'').trim();
+    if(q.length<2)return send(res,400,{error:'Search at least 2 characters'},'application/json',origin);
+    const u='https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(YOUTUBE_API_KEY);
+    const rr=await fetch(u); const d=await rr.json();
+    if(!rr.ok)return send(res,rr.status,{error:d?.error?.message||'YouTube search failed'},'application/json',origin);
+    const items=(d.items||[]).map(it=>({videoId:it.id?.videoId||'',title:it.snippet?.title||'',channel:it.snippet?.channelTitle||'',thumbnail:it.snippet?.thumbnails?.medium?.url||it.snippet?.thumbnails?.default?.url||''})).filter(x=>x.videoId);
+    return send(res,200,{items},'application/json',origin);
+  }
+  if(req.method==='GET'&&p==='/api/admin/data'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);return send(res,200,{orders:db.orders,newsletter:db.newsletter,products:db.products.map(safeProduct),users:db.users.map(u=>({id:u.id,name:u.name,email:u.email,phone:u.phone||'',createdAt:u.createdAt})),reviews:db.reviews,coupons:db.coupons,returns:db.returns,notifications:db.notifications,audit:db.audit,settings:db.settings,site:db.site,music:db.music||{}},'application/json',origin)}
   if(req.method==='GET'&&p==='/api/admin/settings'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);return send(res,200,{settings:db.settings},'application/json',origin)}
   if(req.method==='PATCH'&&p==='/api/admin/settings'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);db.settings={...db.settings,...x};audit('settings.update');save(db);return send(res,200,{ok:true,settings:db.settings},'application/json',origin)}
 

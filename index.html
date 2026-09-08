@@ -21,6 +21,7 @@ button:focus:not(:focus-visible){outline:none}
 .trendProductGrid{margin-top:32px;grid-column:1/-1}
 @media (max-width:700px){.trendProductGrid{margin-top:24px}}
 </style>
+<link rel="stylesheet" href="/music-player.css">
 </head>
 <body>
 <div class="shipping" aria-label="Free shipping announcement"><div class="shipping-track"><span>✦ FREE SHIPPING ON PREPAID ORDERS ABOVE ₹999</span><span>✦ FREE SHIPPING ON PREPAID ORDERS ABOVE ₹999</span><span>✦ FREE SHIPPING ON PREPAID ORDERS ABOVE ₹999</span><span>✦ FREE SHIPPING ON PREPAID ORDERS ABOVE ₹999</span></div></div>
@@ -878,5 +879,6 @@ function hardenMediaFallbacks(){document.querySelectorAll('img').forEach(img=>{i
 async function syncServerPresentation(){try{const r=await fetch('/api/site-config',{cache:'no-store'});if(!r.ok)return;const d=await r.json();applyServerTheme(d.site||{});window.ytStore=d.site?.store||{};window.ytStoreSettings=d.settings||{};hardenMediaFallbacks()}catch(_){}}
 syncServerPresentation();setInterval(syncServerPresentation,15000);hardenMediaFallbacks();
 </script>
+<script src="/music-player.js" defer></script>
 </body>
 </html>

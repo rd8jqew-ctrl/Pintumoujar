@@ -1,0 +1,7 @@
+YOUTUBE API SETUP
+
+Do NOT put the API key in admin.html or client-side JavaScript.
+Set this server environment variable in your hosting dashboard (Render/local environment):
+YOUTUBE_API_KEY=YOUR_KEY_HERE
+
+The Live Music admin page uses the server-side key for YouTube search. Manual YouTube links also work without the key.

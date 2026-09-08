@@ -1,0 +1,9 @@
+(function(){
+  let last='';
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function id(){return 'ytLiveMusic'}
+  async function load(){try{const r=await fetch('/api/music/current',{cache:'no-store'});if(!r.ok)return;const m=await r.json();if(!m.active||!m.videoId){remove();return}if(last===m.videoId&&document.getElementById(id()))return;last=m.videoId;render(m)}catch(_){} }
+  function render(m){remove();const el=document.createElement('div');el.id=id();el.innerHTML=`<div class="ytm-inner"><img class="ytm-art" src="${esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))}" alt=""><div><div class="ytm-title">${esc(m.title||'Live Music')}</div><div class="ytm-channel">${esc(m.channel||'YouTube')} · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play">▶</button><button class="ytm-expand" aria-label="Expand">↗</button></div></div><div class="ytm-frame"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.videoId)}?playsinline=1&rel=0&modestbranding=1" title="Live Music" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;document.body.appendChild(el);const play=el.querySelector('.ytm-play'),exp=el.querySelector('.ytm-expand');play.onclick=()=>{el.classList.add('expanded');play.textContent='■'};exp.onclick=()=>el.classList.toggle('expanded')}
+  function remove(){const el=document.getElementById(id());if(el)el.remove()}
+  load();setInterval(load,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+})();

@@ -9,7 +9,57 @@
   // the YouTube iframe. Internal navigation is handled without a full reload.
   let last='';
   let routing=false;
+  let ytPlayer=null;
+  let ytApiPromise=null;
+  let resumeTimer=null;
   const PLAYER_ID='ytLiveMusic';
+  const RESUME_KEY='pintumoujar_music_resume_v2';
+
+  function getResume(){try{return JSON.parse(sessionStorage.getItem(RESUME_KEY)||'null')}catch(_){return null}}
+  function saveResume(force=false){
+    try{
+      if(!ytPlayer||!ytPlayer.getCurrentTime)return;
+      const videoId=String(player()?.dataset.videoId||''); if(!videoId)return;
+      const state=ytPlayer.getPlayerState?.();
+      const time=Number(ytPlayer.getCurrentTime()||0);
+      if(!Number.isFinite(time))return;
+      const old=getResume();
+      sessionStorage.setItem(RESUME_KEY,JSON.stringify({videoId,time,playing:state===1,updatedAt:Date.now()}));
+    }catch(_){}
+  }
+  function loadYTApi(){
+    if(window.YT&&window.YT.Player)return Promise.resolve(window.YT);
+    if(ytApiPromise)return ytApiPromise;
+    ytApiPromise=new Promise(resolve=>{
+      const old=window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady=function(){try{old&&old()}catch(_){} resolve(window.YT)};
+      if(!document.querySelector('script[data-pintumoujar-yt-api]')){
+        const sc=document.createElement('script');sc.src='https://www.youtube.com/iframe_api';sc.async=true;sc.setAttribute('data-pintumoujar-yt-api','1');document.head.appendChild(sc);
+      }
+    });
+    return ytApiPromise;
+  }
+  function bindYT(el,videoId){
+    loadYTApi().then(YT=>{
+      if(!el.isConnected)return;
+      try{
+        ytPlayer=new YT.Player(el,{
+          events:{
+            onReady:function(ev){
+              const r=getResume();
+              if(r&&r.videoId===videoId&&Number(r.time)>1){try{ev.target.seekTo(Math.max(0,Number(r.time)),true)}catch(_){}}
+              if(r&&r.videoId===videoId&&r.playing){try{ev.target.playVideo()}catch(_){}}
+            },
+            onStateChange:function(ev){
+              if(ev.data===YT.PlayerState.PLAYING||ev.data===YT.PlayerState.PAUSED||ev.data===YT.PlayerState.ENDED)saveResume(true);
+            }
+          }
+        });
+        if(resumeTimer)clearInterval(resumeTimer);
+        resumeTimer=setInterval(saveResume,700);
+      }catch(_){}
+    });
+  }
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function player(){return document.getElementById(PLAYER_ID)}
@@ -38,6 +88,8 @@
     // IMPORTANT: keep the player outside <body>. Route changes replace body content,
     // but this node and its iframe remain alive.
     document.documentElement.appendChild(el);
+    const frame=el.querySelector('iframe');
+    bindYT(frame,String(m.videoId));
     const play=el.querySelector('.ytm-play'), exp=el.querySelector('.ytm-expand');
     play.onclick=()=>{
       el.classList.add('expanded');
@@ -46,7 +98,13 @@
     exp.onclick=()=>el.classList.toggle('expanded');
   }
 
-  function remove(){const el=player();if(el)el.remove()}
+  function remove(){
+    saveResume(true);
+    try{if(ytPlayer&&ytPlayer.destroy)ytPlayer.destroy()}catch(_){}
+    ytPlayer=null;
+    if(resumeTimer){clearInterval(resumeTimer);resumeTimer=null;}
+    const el=player();if(el)el.remove();
+  }
 
   function isInternalHtml(url){
     try{
@@ -153,6 +211,8 @@
 
   window.addEventListener('popstate',()=>navigate(location.href,false));
 
+  window.addEventListener('pagehide',()=>saveResume(true));
+  window.addEventListener('beforeunload',()=>saveResume(true));
   load();
   setInterval(load,15000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});

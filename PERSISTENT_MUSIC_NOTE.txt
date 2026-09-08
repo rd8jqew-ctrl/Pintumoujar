@@ -1,0 +1,7 @@
+V8 Music Resume Fix
+- Saves current YouTube playback position in sessionStorage.
+- Restores the same position when moving between admin.html and public store pages.
+- Preserves playback across public in-app SPA navigation.
+- Prevents duplicate players on the same page.
+- Browser navigation still causes the page to reload, so a tiny interruption can occur; the song resumes from the saved position rather than starting at 0.
+- No API key is stored in these files.

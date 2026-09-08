@@ -162,7 +162,10 @@ async function api(req,res,p){
   }
   if(req.method==='PATCH'&&p==='/api/admin/site-content'){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
-    const x=await body(req);db.site.content={...(db.site.content||{}),banner:String(x.banner||''),bannerButton:String(x.bannerButton||''),bannerLink:String(x.bannerLink||'')};audit('site.content.update');await saveAndFlush(db);return send(res,200,{ok:true,content:db.site.content},'application/json',origin);
+    const x=await body(req);
+    const trendCardImages=Array.from({length:3},(_,i)=>String((Array.isArray(x.trendCardImages)?x.trendCardImages[i]:'')||'').trim());
+    db.site.content={...(db.site.content||{}),banner:String(x.banner||''),bannerButton:String(x.bannerButton||''),bannerLink:String(x.bannerLink||''),editorialImage:String(x.editorialImage||''),trendCardImages};
+    audit('site.content.update');await saveAndFlush(db);return send(res,200,{ok:true,content:db.site.content},'application/json',origin);
   }
   if(req.method==='GET'&&p==='/api/admin/media'){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
@@ -174,7 +177,7 @@ async function api(req,res,p){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
     const name=decodeURIComponent(p.slice('/api/admin/media/'.length));
     if(supabaseStore.enabled){
-      await supabaseStore.deleteMedia(name.replace(/^\/+/,''));
+      await supabaseStore.deleteMedia('products/'+path.basename(name));
       const local=path.join(UPLOADS,path.basename(name));if(fs.existsSync(local))fs.unlinkSync(local);
       audit('media.delete',{name});await saveAndFlush(db);return send(res,200,{ok:true},'application/json',origin);
     }

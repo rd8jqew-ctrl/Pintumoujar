@@ -38,14 +38,18 @@ async function uploadMedia(buffer,objectName,contentType){
   if(!r.ok){const t=await r.text();throw new Error(`Storage upload failed (${r.status}): ${t||'Unknown error'}`);}
   return {objectName:clean,url:publicMediaUrl(clean)};
 }
+const MEDIA_FOLDER='products';
 async function listMedia(){
   if(!enabled) return [];
   await ensureStorageBucket();
   const base=SUPABASE_URL.replace(/\/$/,'')+'/storage/v1/object/list/'+encodeURIComponent(SUPABASE_STORAGE_BUCKET);
-  const r=await fetch(base,{method:'POST',headers:{...storageHeaders(),'Content-Type':'application/json'},body:JSON.stringify({prefix:'',limit:1000,offset:0,sortBy:{column:'created_at',order:'desc'}})});
+  const r=await fetch(base,{method:'POST',headers:{...storageHeaders(),'Content-Type':'application/json'},body:JSON.stringify({prefix:MEDIA_FOLDER+'/',limit:1000,offset:0,sortBy:{column:'created_at',order:'desc'}})});
   if(!r.ok){const t=await r.text();throw new Error(`Storage list failed (${r.status}): ${t||'Unknown error'}`);}
   const rows=await r.json();
-  return (Array.isArray(rows)?rows:[]).filter(x=>x&&x.name).map(x=>({name:x.name,size:Number(x.metadata?.size||0),type:x.metadata?.mimetype||'application/octet-stream',updatedAt:x.updated_at||x.created_at||null,url:publicMediaUrl(x.name)}));
+  // Supabase Storage returns a "virtual folder" entry (id:null, no metadata) for any
+  // sub-path — that placeholder was previously showing up as a fake 0KB media item.
+  // Only keep rows that are real files (have an id and metadata).
+  return (Array.isArray(rows)?rows:[]).filter(x=>x&&x.name&&x.id&&x.metadata).map(x=>({name:x.name,size:Number(x.metadata?.size||0),type:x.metadata?.mimetype||'application/octet-stream',updatedAt:x.updated_at||x.created_at||null,url:publicMediaUrl(MEDIA_FOLDER+'/'+x.name)}));
 }
 async function deleteMedia(objectName){
   if(!enabled) return false;

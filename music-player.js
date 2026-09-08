@@ -5,6 +5,9 @@
   const ADMIN_PATH = location.pathname.endsWith('/admin.html') || location.pathname === '/admin';
   const PLAYER_ID='ytLiveMusic';
   const RESUME_KEY='pintumoujar_music_resume_v4';
+  const UNMUTE_KEY='pintumoujar_music_unmuted_v1';
+  function wasUnmuted(){try{return localStorage.getItem(UNMUTE_KEY)==='1'}catch(_){return false} }
+  function setUnmuted(v){try{localStorage.setItem(UNMUTE_KEY,v?'1':'0')}catch(_){ } }
   let last='';
   let ytPlayer=null;
   let ytApiPromise=null;
@@ -47,8 +50,15 @@
             onReady:function(ev){
               const r=getResume();
               if(r?.videoId===videoId && Number(r.time)>1){try{ev.target.seekTo(Number(r.time),true)}catch(_){} }
-              // Try autoplay for visitors/admin transfer. Browser policy may still require one tap.
-              try{ev.target.playVideo()}catch(_){}
+              // Always start muted first: muted autoplay is never blocked by browsers,
+              // so the song keeps playing/advancing on every page instead of sitting stopped.
+              try{ev.target.mute()}catch(_){ }
+              try{ev.target.playVideo()}catch(_){ }
+              // If this visitor already chose to hear sound before, try to restore it
+              // without another tap. Some browsers allow this, some don't — harmless either way.
+              if(wasUnmuted()){
+                try{ev.target.unMute();ev.target.setVolume(100)}catch(_){ }
+              }
               updateOverlay();
             },
             onStateChange:function(ev){
@@ -68,11 +78,27 @@
 
   function updateOverlay(){
     const el=player(); if(!el)return;
+    const overlay=el.querySelector('.ytm-overlay');
     const btn=el.querySelector('.ytm-overlay-play');
     const hint=el.querySelector('.ytm-overlay-hint');
     let state=-1; try{state=ytPlayer?.getPlayerState?.()??-1}catch(_){ }
-    if(btn)btn.textContent=state===1?'❚❚':'▶';
-    if(hint)hint.textContent=state===1?'Playing here':'Tap to play here';
+    let muted=false; try{muted=!!ytPlayer?.isMuted?.()}catch(_){ }
+    const playing=state===1;
+    if(playing && !muted){
+      // Fully playing with sound: get the overlay out of the way.
+      if(overlay)overlay.style.display='none';
+      const mainBtn=el.querySelector('.ytm-play'); if(mainBtn)mainBtn.textContent='❚❚';
+      return;
+    }
+    if(overlay)overlay.style.display='';
+    if(playing && muted){
+      if(btn)btn.textContent='🔊';
+      if(hint)hint.textContent='Tap to unmute';
+    }else{
+      if(btn)btn.textContent='▶';
+      if(hint)hint.textContent='Tap to play here';
+    }
+    const mainBtn=el.querySelector('.ytm-play'); if(mainBtn)mainBtn.textContent=playing&&!muted?'❚❚':'▶';
   }
 
   function makePlayerShell(m, iframe){
@@ -82,7 +108,21 @@
     el.innerHTML='<div class="ytm-inner"><img class="ytm-art" src="'+esc(m.thumbnail||('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg'))+'" alt="'+esc(m.title||'Live Music')+'"><div><div class="ytm-title">'+esc(m.title||'Live Music')+'</div><div class="ytm-channel">'+esc(m.channel||'YouTube')+' · LIVE NOW</div></div><div class="ytm-controls"><button class="ytm-play" aria-label="Play or pause">▶</button><button class="ytm-expand" aria-label="Show video">↗</button></div></div><div class="ytm-frame"></div><div class="ytm-overlay" aria-label="Play music here"><div class="ytm-overlay-card"><button class="ytm-overlay-play" type="button">▶</button><b>'+esc(m.title||'Live Music')+'</b><span class="ytm-overlay-hint">Tap to play here</span></div></div>';
     el.querySelector('.ytm-frame').appendChild(iframe);
     document.documentElement.appendChild(el);
-    const toggle=()=>{try{if(ytPlayer?.getPlayerState?.()===1)ytPlayer.pauseVideo();else ytPlayer?.playVideo()}catch(_){} updateOverlay()};
+    const toggle=()=>{
+      try{
+        const state=ytPlayer?.getPlayerState?.();
+        const muted=!!ytPlayer?.isMuted?.();
+        if(state===1 && muted){
+          // Already playing silently — this tap means "let me hear it".
+          ytPlayer.unMute();ytPlayer.setVolume(100);setUnmuted(true);
+        }else if(state===1){
+          ytPlayer.pauseVideo();
+        }else{
+          ytPlayer.playVideo();ytPlayer.unMute();ytPlayer.setVolume(100);setUnmuted(true);
+        }
+      }catch(_){ }
+      updateOverlay();
+    };
     el.querySelector('.ytm-play').onclick=toggle;
     el.querySelector('.ytm-overlay').onclick=e=>{e.preventDefault();e.stopPropagation();toggle()};
     el.querySelector('.ytm-overlay').onpointerdown=e=>{e.stopPropagation()};
@@ -104,7 +144,8 @@
     const iframe=document.createElement('iframe');
     const r=getResume();
     const start=(r?.videoId===String(m.videoId)&&Number(r.time)>1)?Math.floor(Number(r.time)):0;
-    iframe.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(m.videoId)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&controls=1'+(start?'&start='+start:'');
+    // mute=1 in the URL guarantees the very first autoplay attempt is never blocked by the browser.
+    iframe.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(m.videoId)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&mute=1&enablejsapi=1&controls=1'+(start?'&start='+start:'');
     iframe.title=m.title||'Live Music';
     iframe.allow='autoplay; encrypted-media; picture-in-picture; web-share';
     iframe.allowFullscreen=true;

@@ -1,4 +1,7 @@
 (function(){
+  // Admin has its own inline player inside the Live Music section. Do not create
+  // a second floating iframe there; two YouTube iframes can play simultaneously.
+  if(location.pathname.endsWith('/admin.html') || location.pathname==='/admin') return;
   if(window.__PINTUMOUJAR_MUSIC_PLAYER__) return;
   window.__PINTUMOUJAR_MUSIC_PLAYER__=true;
   // Persistent site-wide YouTube player + SPA-style navigation.
@@ -26,6 +29,8 @@
 
   function render(m){
     remove();
+    // Only one public music iframe is ever allowed.
+    document.querySelectorAll('#ytLiveMusic iframe').forEach((x,i)=>{if(i>0)x.remove()});
     const el=document.createElement('div');
     el.id=PLAYER_ID;
     el.dataset.videoId=String(m.videoId||'');

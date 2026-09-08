@@ -263,7 +263,9 @@ button:active,.btn:active,.yt-quick-card:active{transform:scale(.97)!important}
 @media(max-width:900px){.music-main-grid{grid-template-columns:1fr}.music-results{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:699px){.music-topbar{flex-direction:column}.music-title{font-size:24px!important}.music-searchbar{height:auto;min-height:52px}.music-search-btn{padding:0 13px}.music-live-inner{grid-template-columns:105px 1fr;gap:12px}.music-live-info h3{font-size:19px}.music-actions{flex-wrap:wrap}.music-results{grid-template-columns:1fr}.music-result{grid-template-columns:72px 1fr}.music-result img{width:72px;height:72px}.music-stats{grid-template-columns:1fr 1fr}.music-note{grid-column:1/-1}}
 </style>
-<link rel="stylesheet" href="/music-player.css"><style data-yt-player-style>#ytLiveMusic{z-index:99999}</style></head>
+<link rel="stylesheet" href="/music-player.css"><style data-yt-player-style>#ytLiveMusic{z-index:99999}
+.music-live-video-shell{margin-top:2px;border:1px solid rgba(126,96,255,.25);border-radius:20px;overflow:hidden;background:linear-gradient(145deg,rgba(7,8,25,.98),rgba(18,10,42,.96));box-shadow:0 20px 55px #0009}.music-live-video{position:relative;aspect-ratio:16/9;min-height:250px;background:#000;overflow:hidden}.music-live-video iframe{display:block;width:100%;height:100%;border:0}.music-video-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#777b99;background:radial-gradient(circle at 50% 35%,rgba(113,54,255,.22),transparent 40%),#070817}.music-video-placeholder-icon{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#6631ff,#a855f7);color:#fff;font-size:28px;box-shadow:0 0 35px rgba(124,60,255,.45)}.music-video-placeholder b{color:#fff;font-size:18px}.music-video-placeholder span{font-size:11px}.music-video-caption{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 15px;background:linear-gradient(90deg,rgba(17,13,43,.98),rgba(9,11,30,.98));border-top:1px solid rgba(126,96,255,.16)}.music-video-caption-main{min-width:0}.music-video-caption-main h3{font-size:19px;margin:6px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.music-video-caption-main p{color:#999cb7;margin:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.music-video-caption-actions{display:flex;gap:8px;flex:none}.music-preview-mode{border-color:rgba(255,193,7,.25)}@media(max-width:699px){.music-live-video{min-height:0}.music-video-caption{align-items:flex-start;flex-direction:column}.music-video-caption-actions{width:100%}.music-video-caption-actions .music-btn{flex:1}.music-video-caption-main h3{font-size:16px}}
+</style></head>
 <body>
 <header><div class="logo">YOUR TYPE</div><div><button class="btn" onclick="window.ytNavigate('/')">Store</button> <button class="btn primary" onclick="adminLogin()">Admin</button></div></header>
 <div class="wrap">
@@ -511,9 +513,25 @@ button:active,.btn:active,.yt-quick-card:active{transform:scale(.97)!important}
     <div class="music-main-grid">
       <div class="music-live-card">
         <div class="music-card-label">NOW LIVE</div>
-        <div class="music-live-inner">
-          <div class="music-art-wrap"><img id="musicLiveArt" src="https://i.ytimg.com/vi/0/hqdefault.jpg" data-video-id="" alt="Live song artwork"><span class="music-art-play">▶</span></div>
-          <div class="music-live-info"><div class="music-live-badge">● LIVE NOW</div><h3 id="musicLiveTitle">No song is live</h3><p id="musicLiveChannel">Set a song from YouTube to start the live player.</p><div class="music-meta"><span> YouTube</span><span id="musicLiveDuration">—</span></div><div class="music-actions"><button class="music-btn primary" onclick="ytMusicOpenPlayer()">▶ Preview</button><button class="music-btn" onclick="ytMusicStop()">■ Stop Live</button></div></div>
+        <div class="music-live-video-shell" id="musicLiveVideoShell">
+          <div class="music-live-video" id="musicLiveVideoBox">
+            <div class="music-video-placeholder" id="musicVideoPlaceholder">
+              <div class="music-video-placeholder-icon">♫</div>
+              <b>No song is live</b>
+              <span>Search a song and press Set Live.</span>
+            </div>
+          </div>
+          <div class="music-video-caption">
+            <div class="music-video-caption-main">
+              <span class="music-live-badge" id="musicVideoBadge">● OFF AIR</span>
+              <h3 id="musicLiveTitle">No song is live</h3>
+              <p id="musicLiveChannel">Set a song from YouTube to start the live player.</p>
+            </div>
+            <div class="music-video-caption-actions">
+              <button class="music-btn primary" onclick="ytMusicOpenPlayer()">▶ Play Here</button>
+              <button class="music-btn" onclick="ytMusicStop()">■ Stop Live</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="music-stats">
@@ -1381,23 +1399,70 @@ async function restoreServerBackup(){
 <script>
 (function(){
   let currentMusic=null;
+  let previewMusic=null;
+  let playerGeneration=0;
   function mEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function mHeaders(){const t=(typeof getAdminToken==='function'?getAdminToken():(sessionStorage.getItem('adminToken')||''));return t?{'Content-Type':'application/json','Authorization':'Bearer '+t}:{'Content-Type':'application/json'}}
   async function mApi(url,opt={}){const r=await fetch(url,Object.assign({},opt,{headers:Object.assign(mHeaders(),opt.headers||{})}));let d={};try{d=await r.json()}catch(_){}if(!r.ok)throw new Error(d.error||('Request failed ('+r.status+')'));return d}
   function parseVideoId(v){const s=String(v||'').trim();if(/^[A-Za-z0-9_-]{6,20}$/.test(s))return s;try{const u=new URL(s);if(u.hostname.includes('youtu.be'))return u.pathname.split('/').filter(Boolean)[0]||'';if(u.searchParams.get('v'))return u.searchParams.get('v');const parts=u.pathname.split('/').filter(Boolean);const i=parts.findIndex(x=>['shorts','embed','live'].includes(x));return i>=0?parts[i+1]||'':''}catch(_){return ''}}
+  function stopInlinePlayer(){
+    const box=document.getElementById('musicLiveVideoBox');
+    if(!box)return;
+    playerGeneration++;
+    const old=box.querySelector('iframe');
+    if(old){old.src='about:blank';old.remove();}
+    box.innerHTML='<div class="music-video-placeholder"><div class="music-video-placeholder-icon">♫</div><b>No song is live</b><span>Search a song and press Set Live.</span></div>';
+  }
+  function playInline(item, mode){
+    if(!item?.videoId)return;
+    const box=document.getElementById('musicLiveVideoBox');if(!box)return;
+    const gen=++playerGeneration;
+    const id=String(item.videoId);
+    const title=mEsc(item.title||'YouTube Music');
+    const src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1';
+    box.innerHTML='<iframe src="'+src+'" title="'+title+'" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe>';
+    box.dataset.videoId=id;
+    const badge=document.getElementById('musicVideoBadge');
+    if(badge){badge.textContent=mode==='preview'?'● PREVIEW':'● LIVE NOW';badge.classList.toggle('music-preview-mode',mode==='preview')}
+    // One player only: remove any old admin floating player if a previous version created it.
+    const oldDock=document.getElementById('ytLiveMusic');if(oldDock)oldDock.remove();
+    return gen;
+  }
   window.ytMusicTab=function(tab,btn){document.querySelectorAll('.music-tab').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');document.getElementById('musicSearchPanel').style.display=tab==='search'?'block':'none';document.getElementById('musicManualPanel').style.display=tab==='manual'?'block':'none'};
   window.ytMusicSearch=async function(){const q=(document.getElementById('musicSearch')?.value||'').trim();if(q.length<2){toast('Search at least 2 characters');return}const box=document.getElementById('musicResults');box.innerHTML='<div class="music-empty">Searching YouTube…</div>';try{const d=await mApi('/api/admin/youtube/search?q='+encodeURIComponent(q));document.getElementById('musicResultCount').textContent=(d.items||[]).length+' results';if(!d.items?.length){box.innerHTML='<div class="music-empty">No YouTube results found.</div>';return}box.innerHTML=d.items.map(x=>`<div class="music-result" role="button" tabindex="0" onclick='ytMusicPreview(${JSON.stringify(x)})' onkeydown="if(event.key==='Enter'||event.key===' ')ytMusicPreview(${JSON.stringify(x)})"><img src="${mEsc(x.thumbnail)}" alt=""><div><h4 title="${mEsc(x.title)}">${mEsc(x.title)}</h4><p>${mEsc(x.channel)}</p><div style="display:flex;gap:8px;align-items:center;margin-top:7px"><button type="button" onclick="event.stopPropagation();ytMusicPreview(${JSON.stringify(x)})">▶ Play Here</button><button type="button" onclick="event.stopPropagation();ytMusicSet(${JSON.stringify(x)});return false">Set Live</button></div></div></div>`).join('')}catch(e){box.innerHTML='<div class="music-empty">'+mEsc(e.message)+'</div>'}};
   window.ytMusicPreview=function(x){
     if(!x?.videoId){toast('Video unavailable');return}
-    const title=mEsc(x.title||'YouTube Music'), channel=mEsc(x.channel||'YouTube');
-    const src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(x.videoId)+'?playsinline=1&rel=0&modestbranding=1&autoplay=1';
-    openModal(`<div class="music-preview-modal" style="background:#070718;border:1px solid #4b3ca5;border-radius:18px;overflow:hidden;max-width:760px;margin:auto;box-shadow:0 20px 80px rgba(78,32,255,.35)"><div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</b><small style="opacity:.7">${channel}</small></div><button class="btn" onclick="closeModal()">Close</button></div><div style="aspect-ratio:16/9;background:#000"><iframe width="100%" height="100%" src="${src}" title="${title}" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe></div><div style="padding:12px 14px;display:flex;justify-content:flex-end"><button class="music-btn primary" onclick='ytMusicSet(${JSON.stringify(x)});closeModal()'>Set Live for Website</button></div></div>`);
+    previewMusic=x;
+    // Preview uses the SAME inline video area. No modal and no second audio source.
+    playInline(x,'preview');
+    const title=document.getElementById('musicLiveTitle'),ch=document.getElementById('musicLiveChannel');
+    if(title)title.textContent=x.title||'YouTube Music';
+    if(ch)ch.textContent=(x.channel||'YouTube')+' · Preview only';
+    toast('Playing here — YouTube par redirect nahi hoga');
   };
-  window.ytMusicSet=async function(x){try{const d=await mApi('/api/admin/music/current',{method:'PUT',body:JSON.stringify(x)});currentMusic=d.music;ytMusicRender(currentMusic);window.dispatchEvent(new CustomEvent('pintumoujar:music-live-changed',{detail:d.music}));toast('New song is LIVE — previous song replaced')}catch(e){toast(e.message)}};
+  window.ytMusicSet=async function(x){try{const d=await mApi('/api/admin/music/current',{method:'PUT',body:JSON.stringify(x)});currentMusic=d.music;previewMusic=null;ytMusicRender(currentMusic);window.dispatchEvent(new CustomEvent('pintumoujar:music-live-changed',{detail:d.music}));toast('New song is LIVE — previous song replaced')}catch(e){toast(e.message)}};
   window.ytMusicSetManual=async function(){const raw=document.getElementById('musicManualUrl')?.value||'',id=parseVideoId(raw);if(!id){toast('Valid YouTube link or video ID required');return}await ytMusicSet({videoId:id,title:'',channel:'',thumbnail:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg'})};
-  window.ytMusicStop=async function(){try{const d=await mApi('/api/admin/music/current',{method:'DELETE'});currentMusic=d.music;ytMusicRender(currentMusic);toast('Live music stopped')}catch(e){toast(e.message)}};
-  window.ytMusicOpenPlayer=function(){if(!currentMusic?.videoId){toast('No live song selected');return}openModal(`<div style="background:#070718;border:1px solid #35306a;border-radius:16px;overflow:hidden"><div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><b>${mEsc(currentMusic.title||'Live Music')}</b><button class="btn" onclick="closeModal()">Close</button></div><div style="aspect-ratio:16/9;background:#000"><iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(currentMusic.videoId)}?playsinline=1&rel=0&modestbranding=1" title="YouTube Music" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div></div>`)};
-  window.ytMusicRender=function(m){currentMusic=m||{};const live=!!m.active&&!!m.videoId;const st=document.getElementById('musicStatusText'),ss=document.getElementById('musicStatStatus');if(st)st.textContent=live?'LIVE NOW':'OFF AIR';if(ss)ss.textContent=live?'Live':'Offline';const title=document.getElementById('musicLiveTitle'),ch=document.getElementById('musicLiveChannel'),du=document.getElementById('musicLiveDuration'),art=document.getElementById('musicLiveArt');if(title)title.textContent=live?(m.title||'YouTube Music'):'No song is live';if(ch)ch.textContent=live?(m.channel||'YouTube'):'Set a song from YouTube to start the live player.';if(du)du.textContent=m.duration||'—';if(art&&live){const id=String(m.videoId||'');art.dataset.videoId=id;art.dataset.fallback='';art.style.visibility='visible';art.style.opacity=1;art.src=m.thumbnail||('https://i.ytimg.com/vi/'+encodeURIComponent(id)+'/hqdefault.jpg');art.onerror=function(){if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://i.ytimg.com/vi/'+encodeURIComponent(this.dataset.videoId)+'/0.jpg'}else{this.style.opacity=.25}}}else if(art){art.removeAttribute('src');art.style.opacity=.25;art.style.visibility='visible'}};
+  window.ytMusicStop=async function(){try{const d=await mApi('/api/admin/music/current',{method:'DELETE'});currentMusic=d.music;previewMusic=null;stopInlinePlayer();ytMusicRender(currentMusic);toast('Live music stopped')}catch(e){toast(e.message)}};
+  window.ytMusicOpenPlayer=function(){
+    if(previewMusic?.videoId){playInline(previewMusic,'preview');return}
+    if(!currentMusic?.videoId){toast('No live song selected');return}
+    playInline(currentMusic,'live');
+  };
+  window.ytMusicRender=function(m){
+    currentMusic=m||{};
+    const live=!!m.active&&!!m.videoId;
+    const st=document.getElementById('musicStatusText'),ss=document.getElementById('musicStatStatus');
+    if(st)st.textContent=live?'LIVE NOW':'OFF AIR';if(ss)ss.textContent=live?'Live':'Offline';
+    const title=document.getElementById('musicLiveTitle'),ch=document.getElementById('musicLiveChannel');
+    if(title)title.textContent=live?(m.title||'YouTube Music'):'No song is live';
+    if(ch)ch.textContent=live?(m.channel||'YouTube'):'Set a song from YouTube to start the live player.';
+    const badge=document.getElementById('musicVideoBadge');if(badge){badge.textContent=live?'● LIVE NOW':'● OFF AIR';badge.classList.remove('music-preview-mode')}
+    if(live){
+      const box=document.getElementById('musicLiveVideoBox');
+      const existing=box?.querySelector('iframe');
+      if(!existing || existing.src.indexOf('/'+encodeURIComponent(String(m.videoId)))<0){playInline(m,'live')}
+    }else{stopInlinePlayer()}
+  };
   window.ytMusicLoad=async function(){try{const d=await mApi('/api/admin/music/current');ytMusicRender(d.music||{})}catch(e){console.warn('Music load failed',e)}};
   window.addEventListener('load',()=>setTimeout(()=>{if(document.getElementById('music'))ytMusicLoad()},500));
 })();

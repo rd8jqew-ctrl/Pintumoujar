@@ -30,7 +30,7 @@ button:focus:not(:focus-visible){outline:none}
   <a class="logo" href="#home" aria-label="YOUR TYPE">YOUR TYPE</a>
   <nav><a href="#home">HOME</a><a href="#shop">SHOP</a><a href="#shop">BESTSELLERS</a><a href="#collections">COLLECTIONS</a></nav>
   <div class="actions">
-    <a class="logoVideo headerVideo" href="#home" aria-label="YOUR TYPE video"><video autoplay muted loop playsinline preload="metadata"><source src="photos/header-logo.mp4" type="video/mp4"></video></a>
+    <a class="logoVideo headerVideo" href="#home" aria-label="SAVAGE logo"><div class="savage-logo-mount" data-savage-logo></div></a>
     <button class="iconBtn searchBtn" aria-label="Search" title="Search" onclick="toggleSearch()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
     </button>
@@ -152,7 +152,7 @@ button:focus:not(:focus-visible){outline:none}
   <div class="editorialArt"><img src="photos/graffiti.jpg" alt="YOUR TYPE graphic"></div>
 </section>
 
-<section class="newsletter" id="newsletter"><div class="newsletterVideo" aria-hidden="true"><video autoplay muted loop playsinline preload="metadata"><source src="photos/stay-in-loop.mp4" type="video/mp4"></video></div><p class="eyebrow">STAY IN THE LOOP</p><h2>Be first to the next drop.</h2><div class="email"><input id="newsletterEmail" type="email" autocomplete="email" placeholder="Enter your email" aria-label="Email address"><button type="button" onclick="joinNewsletter()">JOIN →</button></div><p id="newsletterHint" class="newsletterHint" aria-live="polite"></p></section>
+<section class="newsletter" id="newsletter"><div class="newsletterVideo" aria-hidden="true"><div class="savage-logo-mount" data-savage-logo></div></div><p class="eyebrow">STAY IN THE LOOP</p><h2>Be first to the next drop.</h2><div class="email"><input id="newsletterEmail" type="email" autocomplete="email" placeholder="Enter your email" aria-label="Email address"><button type="button" onclick="joinNewsletter()">JOIN →</button></div><p id="newsletterHint" class="newsletterHint" aria-live="polite"></p></section>
 </main>
 
 <footer class="premiumFooter">
@@ -880,5 +880,7 @@ async function syncServerPresentation(){try{const r=await fetch('/api/site-confi
 syncServerPresentation();setInterval(syncServerPresentation,15000);hardenMediaFallbacks();
 </script>
 <script src="/music-player.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/savage-logo.js" defer></script>
 </body>
 </html>

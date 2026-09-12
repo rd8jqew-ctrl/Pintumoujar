@@ -47,6 +47,7 @@ db.site ||= {hero:'YOUR TYPE',announcement:'New drops every week',sections:{home
 db.site.sections ||= {home:true,collections:true,motion:true,featured:true,bestSellers:true,newCollection:true,trending:true,womenTops:true,highlights:true,editorial:true,newsletter:true};
 db.site.sectionProducts ||= {}; db.site.colorPalette ||= ['Black','White','Charcoal','Red','Blue','Green'];
 db.site.store ||= {name:'YOUR TYPE',phone:'',whatsapp:'',email:'',address:'',currency:'INR'}; db.site.content ||= {banner:'',bannerButton:'',bannerLink:''};
+db.site.categories ||= [];
 const localDeletedProductIds=new Set((db.deletedProductIds||[]).map(String));
 db.products.forEach((p,i)=>{if(!p.id)p.id='p_'+crypto.createHash('sha1').update(String(p.name||'')+'|'+String(p.image||'')+'|'+i).digest('hex').slice(0,12);if(!p.sizes)p.sizes=Object.fromEntries(SIZES.map(s=>[s,Math.max(0,Number(p.stock||0))]));if(!p.sku)p.sku='YT-'+String(i+1).padStart(3,'0');if(!Array.isArray(p.colors)||!p.colors.length)p.colors=['Black','White','Charcoal'];if(!Array.isArray(p.images)||!p.images.length)p.images=[p.image||''];if(p.active===undefined)p.active=true});
 // Never allow a product already marked deleted in the local source to be resurrected.
@@ -118,8 +119,24 @@ async function api(req,res,p){
    const requested=[],reserved=new Map();
    for(const item of x.items){const pr=findProduct(item);if(!pr||pr.active===false)return send(res,400,{error:'Product no longer available: '+String(item.name||item.productId||'')},'application/json',origin);const size=SIZES.includes(String(item.size))?String(item.size):'M';const qty=Math.min(99,Math.max(1,Math.floor(Number(item.qty||1))));const key=pr.id+'|'+size;const already=reserved.get(key)||0;const available=Number(pr.sizes?.[size]||0)-already;if(available<qty)return send(res,409,{error:`${pr.name} size ${size} is out of stock`},'application/json',origin);reserved.set(key,already+qty);requested.push({productId:pr.id,name:pr.name,image:pr.image,sku:pr.sku||'',price:pr.price,size,color:String(item.color||'Black'),qty});}
    for(const [key,qty] of reserved){const [id,size]=key.split('|');const pr=db.products.find(v=>v.id===id);pr.sizes[size]=Math.max(0,Number(pr.sizes[size]||0)-qty)}
-   const customer=auth(req,'customer'),subtotal=requested.reduce((sum,it)=>sum+priceNumber(it.price)*it.qty,0),shipping=subtotal>=Number(db.settings.freeShipping||1999)?0:Number(db.settings.shipping||99),total=subtotal+shipping,id=orderId();
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),pin:String(x.pin),items:requested,subtotal,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:false,awb:'',courier:'',tracking_url:''};
+   const customer=auth(req,'customer'),subtotal=requested.reduce((sum,it)=>sum+priceNumber(it.price)*it.qty,0),shipping=subtotal>=Number(db.settings.freeShipping||1999)?0:Number(db.settings.shipping||99),id=orderId();
+   // Re-validate any coupon on the server (never trust a discount amount sent by the client).
+   let discount=0,couponCode='';
+   const requestedCode=String(x.coupon||x.couponCode||'').trim().toUpperCase();
+   if(requestedCode){
+     const c=db.coupons.find(v=>String(v.code).toUpperCase()===requestedCode);
+     if(c&&c.active!==false&&(!c.expiresAt||new Date(c.expiresAt).getTime()>=Date.now())&&subtotal>=Number(c.minOrder||0)){
+       discount=Math.round(subtotal*Number(c.value||0)/100);
+       if(Number(c.maxDiscount||0)>0)discount=Math.min(discount,Number(c.maxDiscount));
+       discount=Math.min(discount,subtotal);
+       couponCode=c.code;
+     }
+   }
+   const taxableSubtotal=Math.max(0,subtotal-discount),gstRate=Number(db.settings.gst||0);
+   // Prices are treated as GST-inclusive, so GST is extracted for reporting and does not change the customer-facing total.
+   const gst=gstRate>0?Math.round(taxableSubtotal*gstRate/(100+gstRate)):0;
+   const total=taxableSubtotal+shipping;
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:false,awb:'',courier:'',tracking_url:''};
    db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total},'application/json',origin);
   }
   if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items},'application/json',origin)}
@@ -213,6 +230,14 @@ async function api(req,res,p){
   if(req.method==='PATCH'&&p==='/api/admin/store-settings'){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
     const x=await body(req);db.site.store={...(db.site.store||{}),name:String(x.name||'YOUR TYPE'),phone:String(x.phone||''),whatsapp:String(x.whatsapp||''),email:String(x.email||''),address:String(x.address||''),currency:String(x.currency||'INR')};audit('store.settings.update');await saveAndFlush(db);return send(res,200,{ok:true,store:db.site.store},'application/json',origin);
+  }
+  if(req.method==='PATCH'&&p==='/api/admin/categories'){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    const x=await body(req);
+    const categories=Array.isArray(x.categories)?[...new Set(x.categories.map(v=>String(v).trim()).filter(Boolean))]:[];
+    db.site.categories=categories;
+    audit('categories.update',{count:categories.length});await saveAndFlush(db);
+    return send(res,200,{ok:true,categories:db.site.categories},'application/json',origin);
   }
   if(req.method==='PATCH'&&p==='/api/admin/site-content'){
     if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);

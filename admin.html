@@ -828,27 +828,60 @@ function downloadPDF(){
 }
 function buildOrderPdf(o,kind){
   const W=595,H=842,M=48,doc=pdfDoc(W,H);
+  const INK=[0.078,0.078,0.075],MUTE=[0.54,0.54,0.51],FAINT=[0.9,0.89,0.86],GREEN=[0.11,0.486,0.302],WHITE=[1,1,1];
   const items=Array.isArray(o.items)&&o.items.length?o.items:[{name:prod(o.productId)?.name||'Product',sku:o.sku||prod(o.productId)?.sku||'',size:o.size||'M',color:o.color||'',price:o.price||0,qty:o.qty||1}];
-  let y=H-56;
-  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});
-  doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
-  doc.textRight(W-M,y,16,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
-  doc.textRight(W-M,y-15,9,'Order '+(o.id||'—'),{color:[0.4,0.4,0.4]});
-  y-=34;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=24;
+  function textCenter(cx,yy,size,str,o2={}){const bold=(o2.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;doc.txt(cx-w/2,yy,size,str,o2)}
+  function drawBarcode(x,yBottom,totalW,h,seed,fill){let pos=0,i=0;const s=String(seed||'ORDER');while(pos<totalW-3){const c=s.charCodeAt(i%s.length)||65,w=1+(c%3),gap=1+((c>>2)%2);doc.rect(x+pos,yBottom,w,h,{fill});pos+=w+gap;i++}}
+  function drawQrIcon(x,y,size){const s=size/6;[[0,size-2*s],[size-2*s,size-2*s],[0,0]].forEach(([dx,dy])=>{doc.rect(x+dx,y+dy,2*s,2*s,{stroke:INK,width:1.1});doc.rect(x+dx+0.6*s,y+dy+0.6*s,0.8*s,0.8*s,{fill:INK})});doc.rect(x+2.3*s,y+2.3*s,0.7*s,0.7*s,{fill:INK});doc.rect(x+3.3*s,y+1.3*s,0.7*s,0.7*s,{fill:INK});doc.rect(x+1.3*s,y+3.3*s,0.7*s,0.7*s,{fill:INK})}
+
+  // HEADER BAND
+  const HB=86;doc.rect(0,H-HB,W,HB,{fill:INK});
+  doc.txt(M,H-30,20,'YOUR TYPE',{font:'F2',color:WHITE});
+  doc.txt(M,H-44,8,'PREMIUM STREETWEAR',{color:[0.68,0.68,0.66],spacing:1.3});
+  doc.textRight(W-M,H-26,15,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2',color:WHITE});
+  doc.textRight(W-M,H-40,8.5,'Order '+(o.id||'—'),{color:[0.78,0.78,0.76]});
+  drawBarcode(W-M-150,H-HB+14,150,14,o.id||'ORDER',WHITE);
+  doc.textRight(W-M,H-HB+6,6.5,'SCAN FOR ORDER TRACKING',{color:[0.6,0.6,0.58],spacing:0.8});
+  let y=H-HB-26;
+
+  // META STRIP
   const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-  doc.txt(M,y,7.5,'DATE',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M,y-12,10.5,dateStr,{font:'F2'});
-  doc.txt(M+180,y,7.5,'PAYMENT',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+180,y-12,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
-  doc.txt(M+330,y,7.5,'STATUS',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+330,y-12,10.5,o.status||'New',{font:'F2'});
-  y-=38;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=22;
-  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:[0.4,0.4,0.4],spacing:0.6});y-=16;
+  const metaCols=[M,M+140,M+270,M+390];
+  doc.txt(metaCols[0],y,7,'DATE',{color:MUTE,spacing:0.8});doc.txt(metaCols[0],y-13,10,dateStr,{font:'F2'});
+  doc.txt(metaCols[1],y,7,'PAYMENT',{color:MUTE,spacing:0.8});doc.txt(metaCols[1],y-13,10,String(o.payment||'cod').toUpperCase(),{font:'F2'});
+  doc.txt(metaCols[2],y,7,'STATUS',{color:MUTE,spacing:0.8});doc.txt(metaCols[2],y-13,10,o.status||'New',{font:'F2'});
+  doc.txt(metaCols[3],y,7,'ADDRESS',{color:MUTE,spacing:0.8});doc.txt(metaCols[3],y-13,10,o.verified?'Verified':'Pending',{font:'F2',color:o.verified?GREEN:[0.6,0.4,0.05]});
+  y-=34;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=22;
+
+  // ORDER PROGRESS TIMELINE
+  doc.txt(M,y,7,'ORDER PROGRESS',{color:MUTE,spacing:1});y-=16;
+  const stages=['Confirmed','Packed','Shipped','Out for Delivery','Delivered'];
+  const curIdx=stages.indexOf(o.status);
+  const CW=W-2*M,segW=CW/stages.length,dotSize=9,dotY=y-dotSize;
+  stages.forEach((s,i)=>{
+    const cx=M+segW*i+segW/2,done=curIdx>=0&&i<=curIdx;
+    if(i>0){const prevCx=M+segW*(i-1)+segW/2,lineY=dotY+dotSize/2;doc.line(prevCx+dotSize/2,lineY,cx-dotSize/2,lineY,{color:(curIdx>=0&&i<=curIdx)?GREEN:FAINT,width:1.5})}
+    if(done)doc.rect(cx-dotSize/2,dotY,dotSize,dotSize,{fill:GREEN});else doc.rect(cx-dotSize/2,dotY,dotSize,dotSize,{stroke:[0.82,0.8,0.77],width:1});
+    textCenter(cx,dotY-11,6.8,s,{color:done?INK:[0.65,0.65,0.62],font:i===curIdx?'F2':'F1'});
+  });
+  y=dotY-30;
+
+  // BILL TO / SHIP TO
+  doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=20;
+  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:MUTE,spacing:0.6});
+  doc.textRight(W-M,y,7.5,'THANK YOU FOR SHOPPING WITH US',{color:[0.62,0.62,0.6],spacing:0.6});
+  y-=16;
   doc.txt(M,y,11,o.customer||'—',{font:'F2'});y-=14;
   String(o.address||'—').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:[0.3,0.3,0.3]});y-=13});
   doc.txt(M,y,10,'Phone: '+(o.phone||'—'),{color:[0.3,0.3,0.3]});y-=13;
   if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:[0.3,0.3,0.3]});y-=13}
-  y-=8;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=20;
+  y-=8;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=20;
+
+  // ITEMS TABLE
   const col={item:M,sku:M+195,size:M+270,qty:M+330,unit:M+375,total:W-M};
-  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:[0.4,0.4,0.4]});
-  y-=8;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=16;
+  doc.rect(M-4,y-5,CW+8,16,{fill:INK});
+  doc.txt(col.item,y-1,8,'ITEM',{font:'F2',color:WHITE});doc.txt(col.sku,y-1,8,'SKU',{font:'F2',color:WHITE});doc.txt(col.size,y-1,8,'SIZE/COLOR',{font:'F2',color:WHITE});doc.txt(col.qty,y-1,8,'QTY',{font:'F2',color:WHITE});doc.textRight(col.unit+45,y-1,8,'UNIT',{font:'F2',color:WHITE});doc.textRight(col.total,y-1,8,'TOTAL',{font:'F2',color:WHITE});
+  y-=27;
   items.forEach(it=>{
     const qty=Math.max(1,pdfNum(it.qty)),price=pdfNum(it.price);
     doc.txt(col.item,y,9.5,String(it.name||'Product').slice(0,24),{font:'F2'});
@@ -859,24 +892,38 @@ function buildOrderPdf(o,kind){
     doc.textRight(col.total,y,9.5,money(price*qty),{font:'F2'});
     y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
   });
-  y-=5;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=22;
+  y-=6;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=18;
+
+  // TRUST BADGES
+  textCenter(W/2,y,7.5,'PREMIUM QUALITY   -   SAFE & SECURE PACKAGING   -   FAST & RELIABLE DELIVERY',{color:MUTE,spacing:0.6});
+  y-=24;
+
+  // SUMMARY BOX
   const itemsSum=items.reduce((s,it)=>s+pdfNum(it.price)*Math.max(1,pdfNum(it.qty)),0);
   const discount=pdfNum(o.discount),shipping=pdfNum(o.shipping),gst=pdfNum(o.gst);
   const subtotal=o.subtotal||itemsSum,total=o.total||Math.max(0,itemsSum-discount)+shipping;
   const boxX=W-M-210;
   function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||[0.45,0.45,0.45]});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.15]});y-=15}
   totalRow('Subtotal',money(subtotal));
-  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]});
+  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:GREEN});
   totalRow('Shipping',shipping>0?money(shipping):'FREE');
-  y-=3;doc.line(boxX,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=18;
-  doc.txt(boxX,y,12,'TOTAL',{font:'F2'});doc.textRight(W-M,y,14,money(total),{font:'F2'});
-  y-=20;
-  if(gst>0){doc.txt(boxX,y,8,'(Includes GST of '+money(gst)+' at '+(o.gstRate||0)+'%)',{color:[0.55,0.55,0.55]});y-=14}
-  y-=18;
-  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});y-=14;
-  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]});y-=14}
-  y-=14;doc.line(M,y,W-M,y,{color:[0.9,0.9,0.9],width:0.75});y-=18;
-  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:[0.55,0.55,0.55]});
+  if(gst>0)totalRow('GST — included in item price ('+(o.gstRate||0)+'%)',money(gst),{color:[0.65,0.65,0.62]});
+  y-=3;
+  doc.rect(boxX-10,y-18,(W-M)-(boxX-10),22,{fill:INK});
+  doc.txt(boxX,y-6,11,'TOTAL',{font:'F2',color:WHITE});
+  doc.textRight(W-M-6,y-6,13,money(total),{font:'F2',color:WHITE});
+  y-=44;
+
+  // FOOTER: QR + TRACK + VERIFIED/AWB
+  doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=16;
+  const qrY=y-28;
+  drawQrIcon(M,qrY,28);
+  doc.txt(M+38,y-8,10,'Track Your Order',{font:'F2'});
+  doc.txt(M+38,y-20,8.5,'Scan the QR or visit yourtype.in/track',{color:[0.5,0.5,0.5]});
+  doc.textRight(W-M,y-8,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?GREEN:[0.6,0.4,0.05]});
+  if(o.awb)doc.textRight(W-M,y-20,9,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.45,0.45,0.45]});
+  y=qrY-16;doc.line(M,y,W-M,y,{color:[0.93,0.93,0.9],width:0.5});y-=16;
+  textCenter(W/2,y,8,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:MUTE});
   return doc.build();
 }
 function addressSlip(id){let o=state.orders.find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_PACKING_SLIP_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'slip'),'application/pdf')}

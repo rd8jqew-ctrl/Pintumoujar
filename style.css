@@ -186,6 +186,16 @@
 .checkout:disabled{opacity:.35;cursor:not-allowed}
 
 /* PREMIUM RESPONSIVE CHECKOUT */
+.checkoutSteps{max-width:1240px;margin:0 auto;padding:26px 5% 0;display:flex;align-items:center;justify-content:center;gap:0}
+.checkoutSteps .step{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:64px}
+.checkoutSteps .stepDot{width:30px;height:30px;border-radius:50%;border:1px solid #333;display:flex;align-items:center;justify-content:center;font-size:12px;color:#666;background:#0b0b0b;transition:.25s}
+.checkoutSteps .stepLabel{font-size:9px;letter-spacing:1.5px;color:#666;text-transform:uppercase;transition:.25s}
+.checkoutSteps .stepLine{flex:1;max-width:90px;height:1px;background:#242424;margin:0 6px 20px}
+.checkoutSteps .step.done .stepDot{background:#f3f3f3;border-color:#f3f3f3;color:#111}
+.checkoutSteps .step.done .stepLabel{color:#ccc}
+.checkoutSteps .step.active .stepDot{border-color:#f3f3f3;color:#f3f3f3}
+.checkoutSteps .step.active .stepLabel{color:#f3f3f3}
+@media(max-width:600px){.checkoutSteps{padding:20px 4% 0}.checkoutSteps .stepLine{max-width:28px;margin:0 3px 20px}.checkoutSteps .stepLabel{font-size:8px}.checkoutSteps .stepDot{width:26px;height:26px;font-size:11px}}
 .checkoutPage{max-width:1240px;margin:0 auto;padding:clamp(34px,6vw,78px) 5% 90px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.72fr);gap:clamp(34px,6vw,90px);position:relative}
 .checkoutPage>div:first-child{min-width:0}
 .checkoutPage .eyebrow{font-size:9px;letter-spacing:3.5px;color:#777;margin:0 0 12px}

@@ -95,7 +95,7 @@
 const cart=JSON.parse(localStorage.getItem('yourTypeCart')||'[]');
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 const imageUrl=v=>{const s=String(v||'').trim();if(!s)return '/photos/ornament.jpg';if(/^data:|^https?:|^\//i.test(s))return s;if(/^uploads\//i.test(s)||/^photos\//i.test(s))return '/'+s;return '/uploads/'+encodeURIComponent(s)};
-let checkoutSettings={shipping:99,freeShipping:999};
+let checkoutSettings={shipping:99,freeShipping:Infinity};
 const priceOf=p=>Number(String(p?.[1]??p?.price??0).replace(/[^0-9]/g,''))||0;
 const summary=document.getElementById('summary');
 if(!cart.length){summary.innerHTML='<p style="color:#777;font-size:11px;line-height:1.7">Your bag is empty. <a href="index.html">Return to shop</a>.</p>';document.querySelector('.checkout').disabled=true;}

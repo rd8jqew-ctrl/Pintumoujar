@@ -801,17 +801,13 @@ function legacyDownloadReport(){let g=+state.settings.gst||0,live=state.orders.f
 function downloadManual(){downloadText('YOUR_TYPE_STORE_MANUAL.txt','YOUR TYPE STORE MANUAL\\n\\nCustomer: Browse → choose size → place order → My Orders.\\nAdmin: Dashboard → Orders → Inventory → Products → Customers → Reports.\\nInventory is size/SKU based and order placement deducts stock.\\nProduction: deploy the included Node/SQLite backend, configure secrets in .env, payment/courier/notification providers, domain and legal pages.')}
 function pdfNum(v){return Number(String(v??0).replace(/[^0-9.-]/g,''))||0}
 function pdfEscape(s){return String(s==null?'':s).replace(/₹/g,'Rs. ').replace(/[""]/g,'"').replace(/['']/g,"'").replace(/[—–]/g,'-').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').replace(/[^\x20-\x7e]/g,'?')}
-const PDF_W_REG=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
-const PDF_W_BOLD=[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
-function pdfGlyphW(code,bold){const t=bold?PDF_W_BOLD:PDF_W_REG,i=code-32;return(i>=0&&i<t.length)?t[i]:556}
-function pdfStrWidth(str,size,bold){let w=0;const s=String(str==null?'':str);for(let i=0;i<s.length;i++)w+=pdfGlyphW(s.charCodeAt(i),bold);return w*size/1000}
 function pdfDoc(width,height){
   const ops=[];
   function txt(x,y,size,str,o={}){const font=o.font||'F1',c=o.color||[0.09,0.09,0.09];let cmd=`BT /${font} ${size} Tf ${c[0]} ${c[1]} ${c[2]} rg`;if(o.spacing)cmd+=` ${o.spacing} Tc`;cmd+=` ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(str)}) Tj ET`;ops.push(cmd)}
-  function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',w=pdfStrWidth(str,size,bold);txt(xRight-w,y,size,str,o)}
+  function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;txt(xRight-w,y,size,str,o)}
   function line(x1,y1,x2,y2,o={}){const c=o.color||[0.82,0.82,0.82],w=o.width||0.75;ops.push(`q ${w} w ${c[0]} ${c[1]} ${c[2]} RG ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S Q`)}
   function rect(x,y,w,h,o={}){let cmd='q ';if(o.fill)cmd+=`${o.fill[0]} ${o.fill[1]} ${o.fill[2]} rg `;if(o.stroke)cmd+=`${o.width||0.75} w ${o.stroke[0]} ${o.stroke[1]} ${o.stroke[2]} RG `;cmd+=`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re `;cmd+=o.fill&&o.stroke?'B':o.fill?'f':'S';cmd+=' Q';ops.push(cmd)}
-  function build(){const stream=ops.join('\n');const wRegStr=PDF_W_REG.join(' '),wBoldStr=PDF_W_BOLD.join(' ');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [${wRegStr}] >>`,`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [${wBoldStr}] >>`];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
+  function build(){const stream=ops.join('\n');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
   return {txt,textRight,line,rect,build};
 }
 function downloadPDF(){
@@ -833,63 +829,54 @@ function downloadPDF(){
 function buildOrderPdf(o,kind){
   const W=595,H=842,M=48,doc=pdfDoc(W,H);
   const items=Array.isArray(o.items)&&o.items.length?o.items:[{name:prod(o.productId)?.name||'Product',sku:o.sku||prod(o.productId)?.sku||'',size:o.size||'M',color:o.color||'',price:o.price||0,qty:o.qty||1}];
-  const INK=[0.082,0.078,0.071],MUTED=[0.48,0.46,0.41],SOFT=[0.24,0.23,0.21],FAINT=[0.86,0.84,0.77],WASH=[0.95,0.94,0.90],GREEN=[0.16,0.45,0.27],AMBER=[0.55,0.38,0.05];
-  let y=H-40;
-  doc.rect(0,H-92,W,92,{fill:INK});
-  doc.txt(M,y,21,'YOUR TYPE',{font:'F2',color:[1,1,1]});
-  doc.txt(M,y-14,8,'PREMIUM STREETWEAR',{color:[0.72,0.70,0.63],spacing:1.6});
-  doc.textRight(W-M,y,15,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2',color:[1,1,1]});
-  doc.textRight(W-M,y-15,9,'Order '+(o.id||'\u2014'),{color:[0.72,0.70,0.63]});
-  y=H-92-28;
-  const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'\u2014';
-  doc.txt(M,y,7.5,'DATE',{color:MUTED,spacing:0.6});doc.txt(M,y-13,10.5,dateStr,{font:'F2'});
-  doc.txt(M+175,y,7.5,'PAYMENT',{color:MUTED,spacing:0.6});doc.txt(M+175,y-13,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
-  doc.txt(M+320,y,7.5,'STATUS',{color:MUTED,spacing:0.6});
-  const statusStr=o.status||'New',pillW=statusStr.length*6.2+18;
-  doc.rect(M+320,y-24,pillW,16,{fill:INK});
-  doc.txt(M+320+9,y-19.5,9,statusStr,{font:'F2',color:[1,1,1]});
-  y-=42;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=26;
-  doc.txt(M,y,8,'DELIVERY ADDRESS',{font:'F2',color:MUTED,spacing:0.6});y-=16;
-  doc.txt(M,y,11.5,o.customer||'\u2014',{font:'F2'});y-=15;
-  String(o.address||'\u2014').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:SOFT});y-=13});
-  doc.txt(M,y,10,'Phone: '+(o.phone||'\u2014'),{color:SOFT});y-=13;
-  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:SOFT});y-=13}
-  y-=8;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=24;
-  const col={item:M+8,sku:M+205,size:M+275,qty:M+335,unit:M+375,total:W-M-8};
-  doc.rect(M,y-6,W-2*M,20,{fill:WASH});
-  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:MUTED});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:MUTED});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:MUTED});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:MUTED});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:MUTED});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:MUTED});
-  y-=26;
+  let y=H-56;
+  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});
+  doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
+  doc.textRight(W-M,y,16,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
+  doc.textRight(W-M,y-15,9,'Order '+(o.id||'—'),{color:[0.4,0.4,0.4]});
+  y-=34;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=24;
+  const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+  doc.txt(M,y,7.5,'DATE',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M,y-12,10.5,dateStr,{font:'F2'});
+  doc.txt(M+180,y,7.5,'PAYMENT',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+180,y-12,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
+  doc.txt(M+330,y,7.5,'STATUS',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+330,y-12,10.5,o.status||'New',{font:'F2'});
+  y-=38;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=22;
+  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:[0.4,0.4,0.4],spacing:0.6});y-=16;
+  doc.txt(M,y,11,o.customer||'—',{font:'F2'});y-=14;
+  String(o.address||'—').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:[0.3,0.3,0.3]});y-=13});
+  doc.txt(M,y,10,'Phone: '+(o.phone||'—'),{color:[0.3,0.3,0.3]});y-=13;
+  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:[0.3,0.3,0.3]});y-=13}
+  y-=8;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=20;
+  const col={item:M,sku:M+195,size:M+270,qty:M+330,unit:M+375,total:W-M};
+  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:[0.4,0.4,0.4]});
+  y-=8;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=16;
   items.forEach(it=>{
     const qty=Math.max(1,pdfNum(it.qty)),price=pdfNum(it.price);
     doc.txt(col.item,y,9.5,String(it.name||'Product').slice(0,24),{font:'F2'});
-    doc.txt(col.sku,y,9.5,it.sku||'\u2014',{color:MUTED});
-    doc.txt(col.size,y,9.5,(it.size||'\u2014')+' / '+(it.color||'\u2014'),{color:MUTED});
+    doc.txt(col.sku,y,9.5,it.sku||'—',{color:[0.4,0.4,0.4]});
+    doc.txt(col.size,y,9.5,(it.size||'—')+' / '+(it.color||'—'),{color:[0.4,0.4,0.4]});
     doc.txt(col.qty,y,9.5,String(qty));
     doc.textRight(col.unit+45,y,9.5,money(price));
     doc.textRight(col.total,y,9.5,money(price*qty),{font:'F2'});
-    y-=18;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.92,0.89],width:0.5});
+    y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
   });
-  y-=6;doc.line(M,y,W-M,y,{color:INK,width:1});y-=22;
+  y-=5;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=22;
   const itemsSum=items.reduce((s,it)=>s+pdfNum(it.price)*Math.max(1,pdfNum(it.qty)),0);
   const discount=pdfNum(o.discount),shipping=pdfNum(o.shipping),gst=pdfNum(o.gst);
   const subtotal=o.subtotal||itemsSum,total=o.total||Math.max(0,itemsSum-discount)+shipping;
-  const boxX=W-M-220;
-  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||MUTED});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.14]});y-=16}
+  const boxX=W-M-210;
+  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||[0.45,0.45,0.45]});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.15]});y-=15}
   totalRow('Subtotal',money(subtotal));
-  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:GREEN});
+  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]});
   totalRow('Shipping',shipping>0?money(shipping):'FREE');
-  y-=2;doc.line(boxX,y,W-M,y,{color:FAINT,width:0.75});y-=2;
-  const bandH=28,bandW=(W-M)-boxX;
-  doc.rect(boxX,y-bandH+8,bandW,bandH,{fill:INK});
-  doc.txt(boxX+12,y-bandH+18,12.5,'TOTAL',{font:'F2',color:[1,1,1]});
-  doc.textRight(W-M-12,y-bandH+18,15,money(total),{font:'F2',color:[1,1,1]});
-  y-=bandH+16;
-  if(gst>0){doc.txt(boxX,y,8,'Includes GST of '+money(gst)+' at '+(o.gstRate||0)+'%',{color:MUTED});y-=16}
-  y-=6;
-  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?GREEN:AMBER});y-=14;
-  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:SOFT});y-=14}
-  y-=14;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=18;
-  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:MUTED});
+  y-=3;doc.line(boxX,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=18;
+  doc.txt(boxX,y,12,'TOTAL',{font:'F2'});doc.textRight(W-M,y,14,money(total),{font:'F2'});
+  y-=20;
+  if(gst>0){doc.txt(boxX,y,8,'(Includes GST of '+money(gst)+' at '+(o.gstRate||0)+'%)',{color:[0.55,0.55,0.55]});y-=14}
+  y-=18;
+  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});y-=14;
+  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]});y-=14}
+  y-=14;doc.line(M,y,W-M,y,{color:[0.9,0.9,0.9],width:0.75});y-=18;
+  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:[0.55,0.55,0.55]});
   return doc.build();
 }
 function addressSlip(id){let o=state.orders.find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_PACKING_SLIP_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'slip'),'application/pdf')}
@@ -1629,4 +1616,262 @@ async function restoreServerBackup(){
   window.addEventListener('beforeunload',musicResumeSave);
 })();
 </script>
-<script src="/music-player.js" defer></script></body></html>
+<script src="/music-player.js" defer></script>
+<script>
+/* YOUR TYPE — PACKING SLIP / INVOICE UI UPGRADE
+   Keeps the existing admin/order system intact and only replaces the PDF renderer.
+   Falls back to the existing PDF generator if an external PDF/QR library cannot load.
+*/
+(function(){
+  const JSPDF_CDN='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+  const QR_CDN='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  let pdfReady=null;
+
+  function loadScriptOnce(src, test){
+    return new Promise((resolve,reject)=>{
+      if(test && test()) return resolve();
+      const old=document.querySelector('script[data-yt-pdf-lib="'+src+'"]');
+      if(old){old.addEventListener('load',()=>resolve());old.addEventListener('error',reject);return;}
+      const sc=document.createElement('script');
+      sc.src=src;sc.async=true;sc.dataset.ytPdfLib=src;
+      sc.onload=()=>resolve();sc.onerror=reject;
+      document.head.appendChild(sc);
+    });
+  }
+
+  function ensurePdfLibraries(){
+    if(pdfReady) return pdfReady;
+    pdfReady=Promise.all([
+      loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF),
+      loadScriptOnce(QR_CDN,()=>window.QRCode)
+    ]);
+    return pdfReady;
+  }
+
+  function escText(v){
+    return String(v==null?'':v).replace(/\s+/g,' ').trim();
+  }
+  function money2(v){
+    const n=Number(v||0);
+    return 'Rs. '+n.toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
+  }
+  function safeFile(v){
+    return String(v||'').replace(/[^A-Za-z0-9_-]/g,'');
+  }
+  function orderItems(o){
+    if(Array.isArray(o.items)&&o.items.length) return o.items;
+    return [{
+      productId:o.productId||'',
+      name:o.productName||prod?.(o.productId)?.name||'Product',
+      image:o.image||'',
+      sku:o.sku||'',
+      size:o.size||'',
+      color:o.color||'',
+      price:o.price||0,
+      qty:o.qty||1
+    }];
+  }
+  function getProductForItem(it,o){
+    try{
+      return (state.products||[]).find(p=>String(p.id)===String(it.productId||o.productId))||null;
+    }catch(_){return null}
+  }
+  function getImageForItem(it,o){
+    const p=getProductForItem(it,o);
+    return it.image || p?.image || (Array.isArray(p?.images)?p.images[0]:'') || o.image || '';
+  }
+  async function imageData(url){
+    if(!url) return null;
+    try{
+      const u=new URL(url,location.href).href;
+      const r=await fetch(u,{cache:'force-cache'});
+      if(!r.ok) return null;
+      const b=await r.blob();
+      return await new Promise(resolve=>{
+        const fr=new FileReader();
+        fr.onload=()=>resolve(String(fr.result||''));
+        fr.onerror=()=>resolve(null);
+        fr.readAsDataURL(b);
+      });
+    }catch(_){return null}
+  }
+  async function qrData(text){
+    try{
+      const holder=document.createElement('div');
+      holder.style.cssText='position:fixed;left:-10000px;top:-10000px;width:220px;height:220px;background:#fff';
+      document.body.appendChild(holder);
+      new QRCode(holder,{text:String(text||''),width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+      await new Promise(r=>setTimeout(r,80));
+      const canvas=holder.querySelector('canvas');
+      const img=holder.querySelector('img');
+      let data=canvas?canvas.toDataURL('image/png'):null;
+      if(!data && img && img.src){
+        data=await new Promise(resolve=>{
+          const im=new Image();
+          im.crossOrigin='anonymous';
+          im.onload=()=>{const c=document.createElement('canvas');c.width=220;c.height=220;c.getContext('2d').drawImage(im,0,0);resolve(c.toDataURL('image/png'));};
+          im.onerror=()=>resolve(null);im.src=img.src;
+        });
+      }
+      holder.remove();
+      return data;
+    }catch(_){return null}
+  }
+
+  function drawHeader(doc,o,kind){
+    const W=210, M=12;
+    doc.setFillColor(14,14,14);doc.rect(0,0,W,30,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(21);doc.text('YOUR TYPE',M,13);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('PREMIUM STREETWEAR',M,20);
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text(kind==='invoice'?'TAX INVOICE':'PACKING SLIP',W-M,12,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('Better clothes / Bigger stories',W-M,20,{align:'right'});
+    doc.setFillColor(245,245,245);doc.roundedRect(W-78,36,66,20,3,3,'F');
+    doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text('ORDER ID',W-73,42);
+    doc.setFontSize(9);doc.text(escText(o.id||o.serverOrderId||'—'),W-73,49);
+    doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.setTextColor(95,95,95);doc.text('Scan for order details',W-73,54);
+  }
+
+  function sectionTitle(doc,x,y,title){
+    doc.setTextColor(55,55,55);doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.text(String(title).toUpperCase(),x,y);
+  }
+  function addInfoCard(doc,x,y,w,h,title,lines){
+    doc.setFillColor(248,248,248);doc.setDrawColor(225,225,225);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');
+    sectionTitle(doc,x+5,y+6,title);
+    doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(8);
+    let yy=y+13;
+    lines.forEach((line,i)=>{
+      if(!line) return;
+      doc.setFont('helvetica',i===0?'bold':'normal');doc.setFontSize(i===0?8:6.7);
+      const parts=doc.splitTextToSize(String(line),w-10);
+      doc.text(parts.slice(0,2),x+5,yy); yy+=Math.min(9,parts.length*7);
+    });
+  }
+
+  async function buildEnhancedOrderPdf(o,kind){
+    await ensurePdfLibraries();
+    if(!window.jspdf?.jsPDF || !window.QRCode) throw new Error('PDF libraries unavailable');
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+    const W=210,M=12;
+    drawHeader(doc,o,kind);
+    let y=66;
+
+    const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+    const pay=String(o.payment||'cod').toUpperCase()==='COD'?'COD / CASH ON DELIVERY':String(o.payment||'').toUpperCase();
+    doc.setFillColor(245,245,245);doc.setDrawColor(225,225,225);doc.roundedRect(M,y,W-2*M,24,3,3,'FD');
+    const stats=[
+      ['ORDER DATE',dateStr],
+      ['PAYMENT METHOD',pay],
+      ['ORDER STATUS',o.status||'New'],
+      ['DELIVERY PARTNER',o.courier||'Tracking pending']
+    ];
+    const sw=(W-2*M)/4;
+    stats.forEach((s,i)=>{
+      const x=M+i*sw;
+      if(i) {doc.setDrawColor(210,210,210);doc.line(x,y+4,x,y+20);}
+      doc.setTextColor(105,105,105);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text(s[0],x+5,y+7);
+      doc.setTextColor(25,25,25);doc.setFont('helvetica','bold');doc.setFontSize(7.8);doc.text(doc.splitTextToSize(String(s[1]),sw-10).slice(0,2),x+5,y+14);
+    });
+    y+=31;
+
+    const address=[o.address||'—',o.city||'',o.pin||''].filter(Boolean).join(', ');
+    addInfoCard(doc,M,y,88,35,'SHIPPING ADDRESS',[o.customer||'—',address,'Phone: '+(o.phone||'—'),o.email?'Email: '+o.email:'']);
+    addInfoCard(doc,M+91,y,95,35,'BILLING ADDRESS',[o.customer||'—',address,'Phone: '+(o.phone||'—'),o.email?'Email: '+o.email:'']);
+    y+=42;
+
+    const items=orderItems(o);
+    const hasImages=items.some(it=>getImageForItem(it,o));
+    const tableX=M, tableW=W-2*M, headH=9;
+    const cols=hasImages?[10,38,54,21,16,25,34]:[10,52,54,21,16,25,20];
+    const labels=['S.NO','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
+    doc.setFillColor(15,15,15);doc.setTextColor(255,255,255);doc.roundedRect(tableX,y,tableW,headH,2,2,'F');
+    let xx=tableX;
+    labels.forEach((lab,i)=>{doc.setFont('helvetica','bold');doc.setFontSize(5.7);doc.text(lab,xx+3,y+6);xx+=cols[i];});
+    y+=headH;
+    for(let i=0;i<items.length;i++){
+      const it=items[i], qty=Math.max(1,Number(it.qty||1)), price=Number(it.price||0), rowH=hasImages?25:17;
+      doc.setFillColor(i%2?252:247,i%2?252:247,i%2?252:247);doc.setDrawColor(225,225,225);doc.rect(tableX,y,tableW,rowH,'FD');
+      let x=tableX;
+      doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(String(i+1),x+4,y+10);x+=cols[0];
+      if(hasImages){
+        const im=await imageData(getImageForItem(it,o));
+        if(im){try{doc.addImage(im,'JPEG',x+2,y+2,20,20);}catch(_){try{doc.addImage(im,'PNG',x+2,y+2,20,20);}catch(__){}}}
+        const tx=x+24;
+        doc.setFont('helvetica','bold');doc.setFontSize(7.3);doc.text(doc.splitTextToSize(escText(it.name||'Product'),cols[1]-26).slice(0,2),tx,y+7);
+        doc.setFont('helvetica','normal');doc.setFontSize(5.8);doc.setTextColor(95,95,95);doc.text('Premium streetwear',tx,y+16);
+      }else{
+        doc.setFont('helvetica','bold');doc.setFontSize(7.3);doc.text(doc.splitTextToSize(escText(it.name||'Product'),cols[1]-6).slice(0,2),x+3,y+7);
+      }
+      x+=cols[1];
+      doc.setFont('helvetica','normal');doc.setFontSize(6.4);doc.setTextColor(65,65,65);doc.text(escText(it.sku||'—').slice(0,14),x+3,y+10);x+=cols[2];
+      doc.text((escText(it.size||'—')+' / '+escText(it.color||'—')).slice(0,18),x+3,y+10);x+=cols[3];
+      doc.text(String(qty),x+5,y+10);x+=cols[4];
+      doc.text(money2(price),x+2,y+10);x+=cols[5];
+      doc.setFont('helvetica','bold');doc.text(money2(price*qty),x+2,y+10);
+      y+=rowH;
+    }
+    y+=5;
+
+    const itemsSum=items.reduce((s,it)=>s+Number(it.price||0)*Math.max(1,Number(it.qty||1)),0);
+    const discount=Number(o.discount||0), shipping=Number(o.shipping||0), gst=Number(o.gst||0);
+    const subtotal=Number(o.subtotal||itemsSum), total=Number(o.total||Math.max(0,subtotal-discount)+shipping);
+    const boxX=105, boxW=93;
+    doc.setFillColor(248,248,248);doc.setDrawColor(225,225,225);doc.roundedRect(boxX,y,boxW,54,3,3,'FD');
+    let ty=y+9;
+    const row=(label,val,color=[80,80,80],bold=false)=>{
+      doc.setTextColor(...color);doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(7);
+      doc.text(label,boxX+6,ty);doc.text(val,boxX+boxW-6,ty,{align:'right'});ty+=8;
+    };
+    row('SUBTOTAL',money2(subtotal));
+    if(discount>0)row('DISCOUNT'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money2(discount),[25,120,70]);
+    row('SHIPPING',shipping?money2(shipping):'FREE');
+    doc.setDrawColor(35,35,35);doc.line(boxX+6,ty-3,boxX+boxW-6,ty-3);ty+=3;
+    row('TOTAL',money2(total),[20,20,20],true);
+    if(gst>0){doc.setTextColor(110,110,110);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('Includes GST '+money2(gst)+' @ '+Number(o.gstRate||0)+'%',boxX+6,ty);}
+
+    const qrPayload=o.tracking_url||('Order ID: '+(o.id||o.serverOrderId||'—'));
+    const qr=await qrData(qrPayload);
+    const qx=M,qy=y,qsize=36;
+    doc.setFillColor(255,255,255);doc.setDrawColor(225,225,225);doc.roundedRect(qx,qy,qsize,54,3,3,'FD');
+    if(qr) doc.addImage(qr,'PNG',qx+3,qy+3,30,30);
+    doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text('SCAN TO TRACK',qx+3,qy+39);
+    doc.setFont('helvetica','normal');doc.setFontSize(5.2);doc.setTextColor(100,100,100);doc.text(doc.splitTextToSize(o.tracking_url?'Courier tracking':'Order ID '+(o.id||'—'),30).slice(0,2),qx+3,qy+44);
+
+    const footY=y+64;
+    doc.setFillColor(15,15,15);doc.rect(0,footY,W,28,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('YOUR TYPE',M,footY+9);
+    doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('PREMIUM STREETWEAR',M,footY+16);
+    doc.setFontSize(6.2);doc.text('Thank you for choosing us.',W-M,footY+10,{align:'right'});
+    doc.setFontSize(5.2);doc.text('Better clothes / Bigger stories',W-M,footY+17,{align:'right'});
+    if(o.awb){
+      doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+      doc.text('AWB: '+escText(o.awb)+(o.courier?' · '+escText(o.courier):''),M,footY-5);
+    }
+    doc.save('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.id||o.serverOrderId||'ORDER')+'.pdf');
+  }
+
+  window.addressSlip=async function(id){
+    const o=(state.orders||[]).find(x=>String(x.id||x.orderId)===String(id));
+    if(!o){toast('Order not found');return}
+    toast('Preparing packing slip…');
+    try{await buildEnhancedOrderPdf(o,'slip');toast('Packing slip downloaded')}catch(e){
+      console.error(e);
+      try{downloadText('YOUR_TYPE_PACKING_SLIP_'+safeFile(id)+'.pdf',buildOrderPdf(o,'slip'),'application/pdf');}
+      catch(_){toast('Unable to create packing slip PDF')}
+    }
+  };
+  window.invoiceById=async function(id){
+    const o=(state.orders||[]).find(x=>String(x.id||x.orderId)===String(id));
+    if(!o){toast('Order not found');return}
+    toast('Preparing invoice…');
+    try{await buildEnhancedOrderPdf(o,'invoice');toast('Invoice downloaded')}catch(e){
+      console.error(e);
+      try{downloadText('YOUR_TYPE_INVOICE_'+safeFile(id)+'.pdf',buildOrderPdf(o,'invoice'),'application/pdf');}
+      catch(_){toast('Unable to create invoice PDF')}
+    }
+  };
+})();
+</script>
+
+</body></html>

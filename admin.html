@@ -1195,7 +1195,7 @@ async function restoreServerBackup(){
 
   function localProduct(p){const sizes=p.sizes||{};return {id:String(p.id),name:p.name||'',price:num(p.price),cost:num(p.cost),sku:p.sku||'',category:p.category||'T-Shirts',description:p.description||'',sizes:Object.keys(sizes).filter(k=>['S','M','L','XL','XXL'].includes(k)),colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],images:Array.isArray(p.images)&&p.images.length?p.images:[p.image||''],image:p.image||((p.images||[])[0]||''),hidden:p.active===false,featured:Boolean(p.featured)}};
   function localOrder(o){
-    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:[o.address,o.city,o.pin].filter(Boolean).join('\n'),productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[],subtotal:num(o.subtotal),discount:num(o.discount),couponCode:o.couponCode||'',taxableSubtotal:num(o.taxableSubtotal),gstRate:num(o.gstRate),gst:num(o.gst),shipping:num(o.shipping),total:num(o.total)};}
+    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:o.address||'',city:o.city||'',pin:o.pin||'',state:o.state||'',productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[],subtotal:num(o.subtotal),discount:num(o.discount),couponCode:o.couponCode||'',taxableSubtotal:num(o.taxableSubtotal),gstRate:num(o.gstRate),gst:num(o.gst),shipping:num(o.shipping),total:num(o.total)};}
     return o;
   }
 
@@ -1618,259 +1618,164 @@ async function restoreServerBackup(){
 </script>
 <script src="/music-player.js" defer></script>
 <script>
-/* YOUR TYPE — PACKING SLIP / INVOICE UI UPGRADE
-   Keeps the existing admin/order system intact and only replaces the PDF renderer.
-   Falls back to the existing PDF generator if an external PDF/QR library cannot load.
+/* YOUR TYPE — PREMIUM INVOICE / PACKING SLIP PDF
+   Only replaces the PDF renderer. Existing order/admin behaviour remains unchanged.
 */
 (function(){
   const JSPDF_CDN='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
   const QR_CDN='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
   let pdfReady=null;
+  const escText=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+  const money2=v=>'Rs. '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
+  const safeFile=v=>String(v||'ORDER').replace(/[^A-Za-z0-9_-]/g,'');
+  const num=v=>Number(String(v??0).replace(/[^0-9.-]/g,''))||0;
 
-  function loadScriptOnce(src, test){
-    return new Promise((resolve,reject)=>{
-      if(test && test()) return resolve();
-      const old=document.querySelector('script[data-yt-pdf-lib="'+src+'"]');
-      if(old){old.addEventListener('load',()=>resolve());old.addEventListener('error',reject);return;}
-      const sc=document.createElement('script');
-      sc.src=src;sc.async=true;sc.dataset.ytPdfLib=src;
-      sc.onload=()=>resolve();sc.onerror=reject;
-      document.head.appendChild(sc);
+  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{
+    if(test&&test())return resolve();
+    const old=document.querySelector('script[data-yt-pdf-lib="'+src+'"]');
+    if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}
+    const sc=document.createElement('script');sc.src=src;sc.async=true;sc.dataset.ytPdfLib=src;sc.onload=resolve;sc.onerror=reject;document.head.appendChild(sc);
+  });}
+  function ensurePdfLibraries(){if(pdfReady)return pdfReady;pdfReady=Promise.all([
+    loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF),
+    loadScriptOnce(QR_CDN,()=>window.QRCode)
+  ]);return pdfReady;}
+
+  function productForItem(it,o){
+    const id=it?.productId||o?.productId;
+    return (state.products||[]).find(p=>String(p.id)===String(id))||null;
+  }
+  function itemList(o){
+    if(Array.isArray(o.items)&&o.items.length)return o.items.map(it=>{
+      const p=productForItem(it,o)||{};
+      return {...it,
+        name:p.name||it.name||o.productName||'Product',
+        sku:p.sku||it.sku||'',
+        image:p.image||(Array.isArray(p.images)?p.images[0]:'')||it.image||'',
+        price:num(it.price||p.price||o.price),
+        qty:Math.max(1,Math.floor(num(it.qty||1))),
+        size:it.size||o.size||'',color:it.color||o.color||'Black'
+      };
     });
+    const p=productForItem(o,o)||{};
+    return [{productId:o.productId||'',name:o.productName||p.name||'Product',sku:o.sku||p.sku||'',image:o.image||p.image||(Array.isArray(p.images)?p.images[0]:'')||'',price:num(o.price||p.price),qty:Math.max(1,Math.floor(num(o.qty||1))),size:o.size||'',color:o.color||'Black'}];
   }
-
-  function ensurePdfLibraries(){
-    if(pdfReady) return pdfReady;
-    pdfReady=Promise.all([
-      loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF),
-      loadScriptOnce(QR_CDN,()=>window.QRCode)
-    ]);
-    return pdfReady;
+  function stateFromOrder(o){
+    const direct=escText(o.state||o.stateName||o.province||o.region);
+    if(direct)return direct;
+    const text=escText(o.address);
+    const m=text.match(/\b(Karnataka|Kerala|Tamil Nadu|Telangana|Andhra Pradesh|Maharashtra|Delhi|Gujarat|Rajasthan|West Bengal|Uttar Pradesh|Madhya Pradesh|Bihar|Odisha|Punjab|Haryana|Goa|Jharkhand|Chhattisgarh|Assam|Uttarakhand|Himachal Pradesh|Jammu and Kashmir|Jammu & Kashmir|Sikkim|Meghalaya|Manipur|Mizoram|Nagaland|Tripura|Arunachal Pradesh)\b/i);
+    if(m)return m[1];
+    const pin=escText(o.pin||'').replace(/\D/g,'');
+    if(/^560/.test(pin))return 'Karnataka';
+    if(/^110/.test(pin))return 'Delhi';
+    if(/^400/.test(pin))return 'Maharashtra';
+    if(/^600/.test(pin))return 'Tamil Nadu';
+    if(/^500/.test(pin))return 'Telangana';
+    if(/^700/.test(pin))return 'West Bengal';
+    if(/^380/.test(pin))return 'Gujarat';
+    if(/^302/.test(pin))return 'Rajasthan';
+    if(/^201|^226/.test(pin))return 'Uttar Pradesh';
+    return 'State not provided';
   }
-
-  function escText(v){
-    return String(v==null?'':v).replace(/\s+/g,' ').trim();
+  function addressLines(o){
+    const addr=escText(o.address||'—');
+    const city=escText(o.city||'');
+    const pin=escText(o.pin||'');
+    const st=stateFromOrder(o);
+    return [addr,city?city+(pin?' - '+pin:''):pin,st].filter(Boolean);
   }
-  function money2(v){
-    const n=Number(v||0);
-    return 'Rs. '+n.toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
-  }
-  function safeFile(v){
-    return String(v||'').replace(/[^A-Za-z0-9_-]/g,'');
-  }
-  function orderItems(o){
-    if(Array.isArray(o.items)&&o.items.length) return o.items;
-    return [{
-      productId:o.productId||'',
-      name:o.productName||prod?.(o.productId)?.name||'Product',
-      image:o.image||'',
-      sku:o.sku||'',
-      size:o.size||'',
-      color:o.color||'',
-      price:o.price||0,
-      qty:o.qty||1
-    }];
-  }
-  function getProductForItem(it,o){
-    try{
-      return (state.products||[]).find(p=>String(p.id)===String(it.productId||o.productId))||null;
-    }catch(_){return null}
-  }
-  function getImageForItem(it,o){
-    const p=getProductForItem(it,o);
-    return it.image || p?.image || (Array.isArray(p?.images)?p.images[0]:'') || o.image || '';
-  }
-  async function imageData(url){
-    if(!url) return null;
-    try{
-      const u=new URL(url,location.href).href;
-      const r=await fetch(u,{cache:'force-cache'});
-      if(!r.ok) return null;
-      const b=await r.blob();
-      return await new Promise(resolve=>{
-        const fr=new FileReader();
-        fr.onload=()=>resolve(String(fr.result||''));
-        fr.onerror=()=>resolve(null);
-        fr.readAsDataURL(b);
-      });
-    }catch(_){return null}
+  function imageData(url){
+    if(!url)return Promise.resolve(null);
+    return new Promise(resolve=>{
+      try{
+        const im=new Image();im.crossOrigin='anonymous';
+        im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);resolve(c.toDataURL('image/jpeg',.88));}catch(_){resolve(null)}};
+        im.onerror=()=>resolve(null);
+        im.src=new URL(url,location.href).href;
+      }catch(_){resolve(null)}
+    });
   }
   async function qrData(text){
     try{
-      const holder=document.createElement('div');
-      holder.style.cssText='position:fixed;left:-10000px;top:-10000px;width:220px;height:220px;background:#fff';
-      document.body.appendChild(holder);
-      new QRCode(holder,{text:String(text||''),width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
-      await new Promise(r=>setTimeout(r,80));
-      const canvas=holder.querySelector('canvas');
-      const img=holder.querySelector('img');
-      let data=canvas?canvas.toDataURL('image/png'):null;
-      if(!data && img && img.src){
-        data=await new Promise(resolve=>{
-          const im=new Image();
-          im.crossOrigin='anonymous';
-          im.onload=()=>{const c=document.createElement('canvas');c.width=220;c.height=220;c.getContext('2d').drawImage(im,0,0);resolve(c.toDataURL('image/png'));};
-          im.onerror=()=>resolve(null);im.src=img.src;
-        });
-      }
-      holder.remove();
-      return data;
+      if(!window.QRCode)return null;
+      const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:-9999px;width:240px;height:240px;background:#fff';document.body.appendChild(holder);
+      new QRCode(holder,{text:String(text||''),width:240,height:240,colorDark:'#111',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+      await new Promise(r=>setTimeout(r,100));
+      const c=holder.querySelector('canvas');const out=c?c.toDataURL('image/png'):null;holder.remove();return out;
     }catch(_){return null}
   }
-
-  function drawHeader(doc,o,kind){
-    const W=210, M=12;
-    doc.setFillColor(14,14,14);doc.rect(0,0,W,30,'F');
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(21);doc.text('YOUR TYPE',M,13);
-    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('PREMIUM STREETWEAR',M,20);
-    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text(kind==='invoice'?'TAX INVOICE':'PACKING SLIP',W-M,12,{align:'right'});
-    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('Better clothes / Bigger stories',W-M,20,{align:'right'});
-    doc.setFillColor(245,245,245);doc.roundedRect(W-78,36,66,20,3,3,'F');
-    doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text('ORDER ID',W-73,42);
-    doc.setFontSize(9);doc.text(escText(o.id||o.serverOrderId||'—'),W-73,49);
-    doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.setTextColor(95,95,95);doc.text('Scan for order details',W-73,54);
+  function textFit(doc,text,x,y,maxW,maxLines,size,bold){
+    doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(25,25,25);
+    doc.text(doc.splitTextToSize(escText(text)||'—',maxW).slice(0,maxLines),x,y);
   }
-
-  function sectionTitle(doc,x,y,title){
-    doc.setTextColor(55,55,55);doc.setFont('helvetica','bold');doc.setFontSize(7);
-    doc.text(String(title).toUpperCase(),x,y);
+  function drawTop(doc,o,kind){
+    const W=210,M=10;
+    doc.setFillColor(12,12,12);doc.rect(0,0,W,31,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text('YOUR TYPE',M,14);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('PREMIUM STREETWEAR',M,22);
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(kind==='invoice'?'TAX INVOICE':'PACKING SLIP',W-M,13,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(6);doc.text('BETTER CLOTHES   /   BIGGER STORIES',W-M,21,{align:'right'});
+    doc.setFillColor(245,245,245);doc.roundedRect(W-73,37,63,19,3,3,'F');
+    doc.setTextColor(90,90,90);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text('ORDER ID',W-68,43);
+    doc.setTextColor(20,20,20);doc.setFontSize(8.5);doc.text(escText(o.orderId||o.id||o.serverOrderId||'—'),W-68,50);
   }
-  function addInfoCard(doc,x,y,w,h,title,lines){
-    doc.setFillColor(248,248,248);doc.setDrawColor(225,225,225);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');
-    sectionTitle(doc,x+5,y+6,title);
-    doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(8);
+  function infoCard(doc,x,y,w,h,title,lines){
+    doc.setFillColor(249,249,249);doc.setDrawColor(225,225,225);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');
+    doc.setTextColor(90,90,90);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text(title,x+5,y+6);
     let yy=y+13;
-    lines.forEach((line,i)=>{
-      if(!line) return;
-      doc.setFont('helvetica',i===0?'bold':'normal');doc.setFontSize(i===0?8:6.7);
-      const parts=doc.splitTextToSize(String(line),w-10);
-      doc.text(parts.slice(0,2),x+5,yy); yy+=Math.min(9,parts.length*7);
-    });
+    lines.forEach((line,i)=>{if(!line)return;doc.setFont('helvetica',i===0?'bold':'normal');doc.setFontSize(i===0?8:6.5);doc.setTextColor(i===0?25:75,i===0?25:75,i===0?25:75);doc.text(doc.splitTextToSize(String(line),w-10).slice(0,2),x+5,yy);yy+=i===0?8:7});
   }
-
-  async function buildEnhancedOrderPdf(o,kind){
+  async function buildPremiumPdf(o,kind){
     await ensurePdfLibraries();
-    if(!window.jspdf?.jsPDF || !window.QRCode) throw new Error('PDF libraries unavailable');
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-    const W=210,M=12;
-    drawHeader(doc,o,kind);
-    let y=66;
-
-    const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-    const pay=String(o.payment||'cod').toUpperCase()==='COD'?'COD / CASH ON DELIVERY':String(o.payment||'').toUpperCase();
-    doc.setFillColor(245,245,245);doc.setDrawColor(225,225,225);doc.roundedRect(M,y,W-2*M,24,3,3,'FD');
-    const stats=[
-      ['ORDER DATE',dateStr],
-      ['PAYMENT METHOD',pay],
-      ['ORDER STATUS',o.status||'New'],
-      ['DELIVERY PARTNER',o.courier||'Tracking pending']
-    ];
-    const sw=(W-2*M)/4;
-    stats.forEach((s,i)=>{
-      const x=M+i*sw;
-      if(i) {doc.setDrawColor(210,210,210);doc.line(x,y+4,x,y+20);}
-      doc.setTextColor(105,105,105);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text(s[0],x+5,y+7);
-      doc.setTextColor(25,25,25);doc.setFont('helvetica','bold');doc.setFontSize(7.8);doc.text(doc.splitTextToSize(String(s[1]),sw-10).slice(0,2),x+5,y+14);
-    });
+    if(!window.jspdf?.jsPDF)throw new Error('PDF library unavailable');
+    const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+    const W=210,M=10,contentW=W-2*M;drawTop(doc,o,kind);let y=64;
+    const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+    const payment=String(o.payment||'cod').toUpperCase()==='COD'?'COD / CASH ON DELIVERY':String(o.payment||'').toUpperCase();
+    const status=escText(o.status||'New');const courier=escText(o.courier||'Tracking pending');
+    doc.setFillColor(246,246,246);doc.setDrawColor(225,225,225);doc.roundedRect(M,y,contentW,24,2.5,2.5,'FD');
+    const stats=[['ORDER DATE',date],['PAYMENT METHOD',payment],['ORDER STATUS',status],['DELIVERY PARTNER',courier]];const sw=contentW/4;
+    stats.forEach((s,i)=>{const x=M+i*sw;if(i){doc.setDrawColor(215,215,215);doc.line(x,y+4,x,y+20)}doc.setTextColor(95,95,95);doc.setFont('helvetica','bold');doc.setFontSize(5.6);doc.text(s[0],x+5,y+7);doc.setTextColor(25,25,25);doc.setFontSize(7.2);doc.text(doc.splitTextToSize(s[1],sw-10).slice(0,2),x+5,y+14)});
     y+=31;
-
-    const address=[o.address||'—',o.city||'',o.pin||''].filter(Boolean).join(', ');
-    addInfoCard(doc,M,y,88,35,'SHIPPING ADDRESS',[o.customer||'—',address,'Phone: '+(o.phone||'—'),o.email?'Email: '+o.email:'']);
-    addInfoCard(doc,M+91,y,95,35,'BILLING ADDRESS',[o.customer||'—',address,'Phone: '+(o.phone||'—'),o.email?'Email: '+o.email:'']);
-    y+=42;
-
-    const items=orderItems(o);
-    const hasImages=items.some(it=>getImageForItem(it,o));
-    const tableX=M, tableW=W-2*M, headH=9;
-    const cols=hasImages?[10,38,54,21,16,25,34]:[10,52,54,21,16,25,20];
-    const labels=['S.NO','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
-    doc.setFillColor(15,15,15);doc.setTextColor(255,255,255);doc.roundedRect(tableX,y,tableW,headH,2,2,'F');
-    let xx=tableX;
-    labels.forEach((lab,i)=>{doc.setFont('helvetica','bold');doc.setFontSize(5.7);doc.text(lab,xx+3,y+6);xx+=cols[i];});
-    y+=headH;
+    const ship=addressLines(o);const billing=ship.slice();
+    infoCard(doc,M,y,92,43,'SHIPPING ADDRESS',[o.customer||o.name||'—',...ship,'Phone: '+(o.phone||'—')]);
+    infoCard(doc,M+96,y,94,43,'BILLING ADDRESS',[o.customer||o.name||'—',...billing,'Phone: '+(o.phone||'—')]);
+    y+=49;
+    const items=itemList(o);const tableX=M,tableW=contentW,headerH=9,rowH=32;
+    const cols=[9,68,25,27,14,30,27];const labels=['#','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
+    doc.setFillColor(14,14,14);doc.setTextColor(255,255,255);doc.roundedRect(tableX,y,tableW,headerH,2,2,'F');let x=tableX;
+    labels.forEach((l,i)=>{doc.setFont('helvetica','bold');doc.setFontSize(5.4);doc.text(l,x+3,y+6);x+=cols[i]});y+=headerH;
     for(let i=0;i<items.length;i++){
-      const it=items[i], qty=Math.max(1,Number(it.qty||1)), price=Number(it.price||0), rowH=hasImages?25:17;
-      doc.setFillColor(i%2?252:247,i%2?252:247,i%2?252:247);doc.setDrawColor(225,225,225);doc.rect(tableX,y,tableW,rowH,'FD');
-      let x=tableX;
-      doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(String(i+1),x+4,y+10);x+=cols[0];
-      if(hasImages){
-        const im=await imageData(getImageForItem(it,o));
-        if(im){try{doc.addImage(im,'JPEG',x+2,y+2,20,20);}catch(_){try{doc.addImage(im,'PNG',x+2,y+2,20,20);}catch(__){}}}
-        const tx=x+24;
-        doc.setFont('helvetica','bold');doc.setFontSize(7.3);doc.text(doc.splitTextToSize(escText(it.name||'Product'),cols[1]-26).slice(0,2),tx,y+7);
-        doc.setFont('helvetica','normal');doc.setFontSize(5.8);doc.setTextColor(95,95,95);doc.text('Premium streetwear',tx,y+16);
-      }else{
-        doc.setFont('helvetica','bold');doc.setFontSize(7.3);doc.text(doc.splitTextToSize(escText(it.name||'Product'),cols[1]-6).slice(0,2),x+3,y+7);
-      }
-      x+=cols[1];
-      doc.setFont('helvetica','normal');doc.setFontSize(6.4);doc.setTextColor(65,65,65);doc.text(escText(it.sku||'—').slice(0,14),x+3,y+10);x+=cols[2];
-      doc.text((escText(it.size||'—')+' / '+escText(it.color||'—')).slice(0,18),x+3,y+10);x+=cols[3];
-      doc.text(String(qty),x+5,y+10);x+=cols[4];
-      doc.text(money2(price),x+2,y+10);x+=cols[5];
-      doc.setFont('helvetica','bold');doc.text(money2(price*qty),x+2,y+10);
+      const it=items[i];doc.setFillColor(i%2?252:248,i%2?252:248,i%2?252:248);doc.setDrawColor(225,225,225);doc.rect(tableX,y,tableW,rowH,'FD');x=tableX;
+      doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(String(i+1),x+3,y+14);x+=cols[0];
+      const im=await imageData(it.image);if(im){try{doc.addImage(im,'JPEG',x+2,y+3,25,25);}catch(_){} }
+      textFit(doc,it.name,x+29,y+10,cols[1]-33,2,7.3,true);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.setTextColor(100,100,100);doc.text('YOUR TYPE / PREMIUM STREETWEAR',x+29,y+20);x+=cols[1];
+      textFit(doc,it.sku||'—',x+3,y+14,cols[2]-6,2,6.2,false);x+=cols[2];
+      textFit(doc,(it.size||'—')+' / '+(it.color||'—'),x+3,y+14,cols[3]-6,2,6.2,false);x+=cols[3];
+      textFit(doc,String(it.qty||1),x+4,y+14,cols[4]-5,1,6.5,false);x+=cols[4];
+      textFit(doc,money2(it.price),x+2,y+14,cols[5]-5,2,6.2,false);x+=cols[5];
+      doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text(money2(num(it.price)*num(it.qty||1)),x+2,y+14);
       y+=rowH;
     }
-    y+=5;
-
-    const itemsSum=items.reduce((s,it)=>s+Number(it.price||0)*Math.max(1,Number(it.qty||1)),0);
-    const discount=Number(o.discount||0), shipping=Number(o.shipping||0), gst=Number(o.gst||0);
-    const subtotal=Number(o.subtotal||itemsSum), total=Number(o.total||Math.max(0,subtotal-discount)+shipping);
-    const boxX=105, boxW=93;
-    doc.setFillColor(248,248,248);doc.setDrawColor(225,225,225);doc.roundedRect(boxX,y,boxW,54,3,3,'FD');
-    let ty=y+9;
-    const row=(label,val,color=[80,80,80],bold=false)=>{
-      doc.setTextColor(...color);doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(7);
-      doc.text(label,boxX+6,ty);doc.text(val,boxX+boxW-6,ty,{align:'right'});ty+=8;
-    };
-    row('SUBTOTAL',money2(subtotal));
-    if(discount>0)row('DISCOUNT'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money2(discount),[25,120,70]);
-    row('SHIPPING',shipping?money2(shipping):'FREE');
-    doc.setDrawColor(35,35,35);doc.line(boxX+6,ty-3,boxX+boxW-6,ty-3);ty+=3;
-    row('TOTAL',money2(total),[20,20,20],true);
-    if(gst>0){doc.setTextColor(110,110,110);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('Includes GST '+money2(gst)+' @ '+Number(o.gstRate||0)+'%',boxX+6,ty);}
-
-    const qrPayload=o.tracking_url||('Order ID: '+(o.id||o.serverOrderId||'—'));
-    const qr=await qrData(qrPayload);
-    const qx=M,qy=y,qsize=36;
-    doc.setFillColor(255,255,255);doc.setDrawColor(225,225,225);doc.roundedRect(qx,qy,qsize,54,3,3,'FD');
-    if(qr) doc.addImage(qr,'PNG',qx+3,qy+3,30,30);
-    doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text('SCAN TO TRACK',qx+3,qy+39);
-    doc.setFont('helvetica','normal');doc.setFontSize(5.2);doc.setTextColor(100,100,100);doc.text(doc.splitTextToSize(o.tracking_url?'Courier tracking':'Order ID '+(o.id||'—'),30).slice(0,2),qx+3,qy+44);
-
-    const footY=y+64;
-    doc.setFillColor(15,15,15);doc.rect(0,footY,W,28,'F');
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('YOUR TYPE',M,footY+9);
-    doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('PREMIUM STREETWEAR',M,footY+16);
-    doc.setFontSize(6.2);doc.text('Thank you for choosing us.',W-M,footY+10,{align:'right'});
-    doc.setFontSize(5.2);doc.text('Better clothes / Bigger stories',W-M,footY+17,{align:'right'});
-    if(o.awb){
-      doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
-      doc.text('AWB: '+escText(o.awb)+(o.courier?' · '+escText(o.courier):''),M,footY-5);
-    }
-    doc.save('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.id||o.serverOrderId||'ORDER')+'.pdf');
+    y+=7;
+    const itemsSum=items.reduce((s,it)=>s+num(it.price)*Math.max(1,num(it.qty)),0);
+    const subtotal=num(o.subtotal||itemsSum),discount=num(o.discount),shipping=num(o.shipping),gst=num(o.gst),total=num(o.total||Math.max(0,subtotal-discount)+shipping);
+    const sumX=105,sumW=95;doc.setFillColor(247,247,247);doc.setDrawColor(225,225,225);doc.roundedRect(sumX,y,sumW,58,3,3,'FD');let ty=y+9;
+    const totalRow=(label,val,opts={})=>{doc.setTextColor(...(opts.color||[75,75,75]));doc.setFont('helvetica',opts.bold?'bold':'normal');doc.setFontSize(opts.size||6.8);doc.text(label,sumX+6,ty);doc.text(val,sumX+sumW-6,ty,{align:'right'});ty+=8};
+    totalRow('SUBTOTAL',money2(subtotal));if(discount)totalRow('DISCOUNT'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money2(discount),{color:[20,125,70]});totalRow('SHIPPING',shipping?money2(shipping):'FREE');
+    doc.setDrawColor(30,30,30);doc.line(sumX+6,ty-3,sumX+sumW-6,ty-3);ty+=2;totalRow('TOTAL',money2(total),{bold:true,size:10,color:[15,15,15]});
+    if(gst){doc.setFont('helvetica','normal');doc.setFontSize(5.2);doc.setTextColor(110,110,110);doc.text('Includes GST '+money2(gst)+' at '+num(o.gstRate)+'%',sumX+6,ty)}
+    const qrPayload=o.tracking_url||('https://yourtype.in/track?order='+encodeURIComponent(o.orderId||o.id||''));const qr=await qrData(qrPayload);
+    const qx=M,qy=y,qw=86;doc.setFillColor(255,255,255);doc.setDrawColor(225,225,225);doc.roundedRect(qx,qy,qw,58,3,3,'FD');
+    if(qr)doc.addImage(qr,'PNG',qx+5,qy+5,38,38);
+    doc.setTextColor(25,25,25);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text('TRACK YOUR ORDER',qx+48,qy+11);doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(95,95,95);doc.text(doc.splitTextToSize(o.tracking_url?'Scan to track shipment':'Scan for order details',31).slice(0,2),qx+48,qy+19);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.setTextColor(35,35,35);doc.text('AWB: '+(o.awb||'Not assigned'),qx+48,qy+34);doc.text('Courier: '+(o.courier||'Not assigned'),qx+48,qy+42);
+    if(o.verified){doc.setTextColor(25,120,70);doc.setFontSize(6.5);doc.text('✓ ADDRESS VERIFIED',qx+48,qy+51)}
+    const footY=Math.min(y+66,258);doc.setFillColor(12,12,12);doc.rect(0,footY,W,30,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('YOUR TYPE',M,footY+10);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('PREMIUM STREETWEAR',M,footY+17);doc.setFontSize(6);doc.text('THANK YOU FOR CHOOSING US.',W-M,footY+10,{align:'right'});doc.text('BETTER CLOTHES / BIGGER STORIES',W-M,footY+17,{align:'right'});doc.setFontSize(5.5);doc.text('yourtype.in',W-M,footY+24,{align:'right'});
+    doc.save('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.orderId||o.id||'ORDER')+'.pdf');
   }
-
-  window.addressSlip=async function(id){
-    const o=(state.orders||[]).find(x=>String(x.id||x.orderId)===String(id));
-    if(!o){toast('Order not found');return}
-    toast('Preparing packing slip…');
-    try{await buildEnhancedOrderPdf(o,'slip');toast('Packing slip downloaded')}catch(e){
-      console.error(e);
-      try{downloadText('YOUR_TYPE_PACKING_SLIP_'+safeFile(id)+'.pdf',buildOrderPdf(o,'slip'),'application/pdf');}
-      catch(_){toast('Unable to create packing slip PDF')}
-    }
-  };
-  window.invoiceById=async function(id){
-    const o=(state.orders||[]).find(x=>String(x.id||x.orderId)===String(id));
-    if(!o){toast('Order not found');return}
-    toast('Preparing invoice…');
-    try{await buildEnhancedOrderPdf(o,'invoice');toast('Invoice downloaded')}catch(e){
-      console.error(e);
-      try{downloadText('YOUR_TYPE_INVOICE_'+safeFile(id)+'.pdf',buildOrderPdf(o,'invoice'),'application/pdf');}
-      catch(_){toast('Unable to create invoice PDF')}
-    }
-  };
+  async function generate(id,kind){const o=(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));if(!o){toast('Order not found');return}toast(kind==='invoice'?'Preparing invoice…':'Preparing packing slip…');try{await buildPremiumPdf(o,kind);toast(kind==='invoice'?'Invoice downloaded':'Packing slip downloaded')}catch(e){console.error(e);try{downloadText('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(id)+'.pdf',buildOrderPdf(o,kind),'application/pdf')}catch(_){toast('Unable to create PDF')}}}
+  window.addressSlip=id=>generate(id,'slip');window.invoiceById=id=>generate(id,'invoice');
 })();
 </script>
 

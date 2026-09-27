@@ -799,14 +799,86 @@ function legacyDownloadOrders(){downloadText('YOUR_TYPE_ORDERS.csv','Order,Custo
 function downloadInventory(){downloadText('YOUR_TYPE_INVENTORY.csv','Product,SKU,Size,Stock,Threshold,Status\\n'+state.inventory.map(x=>{let p=prod(x[0]);return `${p?.name},${p?.sku},${x[1]},${x[2]},${x[3]},${x[2]===0?'OUT':x[2]<=x[3]?'LOW':'OK'}`}).join('\\n'),'text/csv')}
 function legacyDownloadReport(){let g=+state.settings.gst||0,live=state.orders.filter(o=>o.status!=='Cancelled'),rev=live.reduce((a,o)=>a+o.price*o.qty,0),gstTotal=0,profitTotal=0;live.forEach(o=>{let p=prod(o.productId),base=o.price/(1+g/100),cost=p?(+p.cost||0):0;gstTotal+=(o.price-base)*o.qty;profitTotal+=(base-cost)*o.qty});downloadText('YOUR_TYPE_SALES_REPORT.csv','Date,Orders,Revenue,GST Collected,Profit (Est.)\n'+new Date().toLocaleDateString()+','+live.length+','+rev+','+gstTotal.toFixed(2)+','+profitTotal.toFixed(2),'text/csv')}
 function downloadManual(){downloadText('YOUR_TYPE_STORE_MANUAL.txt','YOUR TYPE STORE MANUAL\\n\\nCustomer: Browse → choose size → place order → My Orders.\\nAdmin: Dashboard → Orders → Inventory → Products → Customers → Reports.\\nInventory is size/SKU based and order placement deducts stock.\\nProduction: deploy the included Node/SQLite backend, configure secrets in .env, payment/courier/notification providers, domain and legal pages.')}
-function pdfSafe(s){return String(s).replace(/₹/g,'Rs. ').replace(/[—–]/g,'-').replace(/[""]/g,'"').replace(/['']/g,"'").replace(/[()\\]/g,'').replace(/[^\x20-\x7e]/g,'?')}
-function makePdf(titleLine,bodyLines){let stream='BT /F1 16 Tf 72 790 Td ('+pdfSafe(titleLine)+') Tj 0 -26 TD /F1 11 Tf '+bodyLines.map(l=>l===''?'0 -14 TD':`(${pdfSafe(l)}) Tj 0 -16 TD`).join(' ')+' ET';let objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});let xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
-function downloadPDF(){let bodyLines=state.products.map(p=>`${p.name} — ${money(p.price)} — SKU ${p.sku}`);downloadText('YOUR_TYPE_PRODUCT_BROCHURE.pdf',makePdf('YOUR TYPE — Product Brochure',bodyLines),'application/pdf')}
-function addressSlip(id){let o=state.orders.find(x=>x.id===id);if(!o){toast('Order not found');return}let p=prod(o.productId);let bodyLines=['Order: '+o.id,'Date: '+o.date,'',
-'BILL TO / SHIP TO',o.customer,...o.address.split('\n'),'Phone: '+o.phone,'',
-'PRODUCT DETAILS',`${p?.name||'Deleted Product'}  (SKU ${p?.sku||'—'})`,`Size: ${o.size}   Qty: ${o.qty}`,`Unit Price: ${money(o.price)}   Total: ${money(o.price*o.qty)}`,`Payment: ${o.payment}   Status: ${o.status}`,
-o.awb?`AWB: ${o.awb}${o.courier?' ('+o.courier+')':''}`:''].filter(l=>l!=='');
-downloadText('YOUR_TYPE_ADDRESS_SLIP_'+id.replace('#','')+'.pdf',makePdf('YOUR TYPE — Address / Packing Slip',bodyLines),'application/pdf')}
+function pdfNum(v){return Number(String(v??0).replace(/[^0-9.-]/g,''))||0}
+function pdfEscape(s){return String(s==null?'':s).replace(/₹/g,'Rs. ').replace(/[""]/g,'"').replace(/['']/g,"'").replace(/[—–]/g,'-').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').replace(/[^\x20-\x7e]/g,'?')}
+function pdfDoc(width,height){
+  const ops=[];
+  function txt(x,y,size,str,o={}){const font=o.font||'F1',c=o.color||[0.09,0.09,0.09];let cmd=`BT /${font} ${size} Tf ${c[0]} ${c[1]} ${c[2]} rg`;if(o.spacing)cmd+=` ${o.spacing} Tc`;cmd+=` ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(str)}) Tj ET`;ops.push(cmd)}
+  function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;txt(xRight-w,y,size,str,o)}
+  function line(x1,y1,x2,y2,o={}){const c=o.color||[0.82,0.82,0.82],w=o.width||0.75;ops.push(`q ${w} w ${c[0]} ${c[1]} ${c[2]} RG ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S Q`)}
+  function rect(x,y,w,h,o={}){let cmd='q ';if(o.fill)cmd+=`${o.fill[0]} ${o.fill[1]} ${o.fill[2]} rg `;if(o.stroke)cmd+=`${o.width||0.75} w ${o.stroke[0]} ${o.stroke[1]} ${o.stroke[2]} RG `;cmd+=`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re `;cmd+=o.fill&&o.stroke?'B':o.fill?'f':'S';cmd+=' Q';ops.push(cmd)}
+  function build(){const stream=ops.join('\n');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
+  return {txt,textRight,line,rect,build};
+}
+function downloadPDF(){
+  const W=595,H=842,M=48,doc=pdfDoc(W,H);let y=H-60;
+  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
+  doc.textRight(W-M,y,15,'PRODUCT BROCHURE',{font:'F2'});
+  y-=34;doc.line(M,y,W-M,y,{color:[0.2,0.2,0.2],width:1});y-=20;
+  doc.txt(M,y,8,'PRODUCT',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(M+280,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(W-M,y,8,'PRICE',{font:'F2',color:[0.4,0.4,0.4]});
+  y-=8;doc.line(M,y,W-M,y,{color:[0.2,0.2,0.2],width:0.75});y-=16;
+  (state.products||[]).forEach(p=>{
+    if(y<70){y=H-60;} // simple single-page listing; long catalogs are still exported via CSV
+    doc.txt(M,y,10,String(p.name||'Product').slice(0,42),{font:'F2'});
+    doc.txt(M+280,y,10,p.sku||'—',{color:[0.4,0.4,0.4]});
+    doc.textRight(W-M,y,10,money(p.price),{font:'F2'});
+    y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
+  });
+  downloadText('YOUR_TYPE_PRODUCT_BROCHURE.pdf',doc.build(),'application/pdf');
+}
+function buildOrderPdf(o,kind){
+  const W=595,H=842,M=48,doc=pdfDoc(W,H);
+  const items=Array.isArray(o.items)&&o.items.length?o.items:[{name:prod(o.productId)?.name||'Product',sku:o.sku||prod(o.productId)?.sku||'',size:o.size||'M',color:o.color||'',price:o.price||0,qty:o.qty||1}];
+  let y=H-56;
+  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});
+  doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
+  doc.textRight(W-M,y,16,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
+  doc.textRight(W-M,y-15,9,'Order '+(o.id||'—'),{color:[0.4,0.4,0.4]});
+  y-=34;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=24;
+  const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+  doc.txt(M,y,7.5,'DATE',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M,y-12,10.5,dateStr,{font:'F2'});
+  doc.txt(M+180,y,7.5,'PAYMENT',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+180,y-12,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
+  doc.txt(M+330,y,7.5,'STATUS',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+330,y-12,10.5,o.status||'New',{font:'F2'});
+  y-=38;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=22;
+  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:[0.4,0.4,0.4],spacing:0.6});y-=16;
+  doc.txt(M,y,11,o.customer||'—',{font:'F2'});y-=14;
+  String(o.address||'—').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:[0.3,0.3,0.3]});y-=13});
+  doc.txt(M,y,10,'Phone: '+(o.phone||'—'),{color:[0.3,0.3,0.3]});y-=13;
+  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:[0.3,0.3,0.3]});y-=13}
+  y-=8;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=20;
+  const col={item:M,sku:M+195,size:M+270,qty:M+330,unit:M+375,total:W-M};
+  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:[0.4,0.4,0.4]});
+  y-=8;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=16;
+  items.forEach(it=>{
+    const qty=Math.max(1,pdfNum(it.qty)),price=pdfNum(it.price);
+    doc.txt(col.item,y,9.5,String(it.name||'Product').slice(0,24),{font:'F2'});
+    doc.txt(col.sku,y,9.5,it.sku||'—',{color:[0.4,0.4,0.4]});
+    doc.txt(col.size,y,9.5,(it.size||'—')+' / '+(it.color||'—'),{color:[0.4,0.4,0.4]});
+    doc.txt(col.qty,y,9.5,String(qty));
+    doc.textRight(col.unit+45,y,9.5,money(price));
+    doc.textRight(col.total,y,9.5,money(price*qty),{font:'F2'});
+    y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
+  });
+  y-=5;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=22;
+  const itemsSum=items.reduce((s,it)=>s+pdfNum(it.price)*Math.max(1,pdfNum(it.qty)),0);
+  const discount=pdfNum(o.discount),shipping=pdfNum(o.shipping),gst=pdfNum(o.gst);
+  const subtotal=o.subtotal||itemsSum,total=o.total||Math.max(0,itemsSum-discount)+shipping;
+  const boxX=W-M-210;
+  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||[0.45,0.45,0.45]});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.15]});y-=15}
+  totalRow('Subtotal',money(subtotal));
+  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]});
+  if(gst>0)totalRow('GST ('+(o.gstRate||0)+'%, incl. in price)',money(gst));
+  totalRow('Shipping',shipping>0?money(shipping):'FREE');
+  y-=3;doc.line(boxX,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=18;
+  doc.txt(boxX,y,12,'TOTAL',{font:'F2'});doc.textRight(W-M,y,14,money(total),{font:'F2'});
+  y-=32;
+  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});y-=14;
+  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]});y-=14}
+  y-=14;doc.line(M,y,W-M,y,{color:[0.9,0.9,0.9],width:0.75});y-=18;
+  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:[0.55,0.55,0.55]});
+  return doc.build();
+}
+function addressSlip(id){let o=state.orders.find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_PACKING_SLIP_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'slip'),'application/pdf')}
 function backup(){downloadText('YOUR_TYPE_BACKUP.json',JSON.stringify(state,null,2),'application/json')}
 function restore(){openModal(`<h2>Restore Data</h2><input type=file id=restoreFile accept=".json"><button class=btn primary onclick="doRestore()">Restore</button>`)}
 function doRestore(){let f=restoreFile.files[0];if(!f){toast('Choose backup file');return}let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);save();closeModal();location.reload()}catch(e){toast('Invalid backup')}};r.readAsText(f)}
@@ -1122,7 +1194,7 @@ async function restoreServerBackup(){
 
   function localProduct(p){const sizes=p.sizes||{};return {id:String(p.id),name:p.name||'',price:num(p.price),cost:num(p.cost),sku:p.sku||'',category:p.category||'T-Shirts',description:p.description||'',sizes:Object.keys(sizes).filter(k=>['S','M','L','XL','XXL'].includes(k)),colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],images:Array.isArray(p.images)&&p.images.length?p.images:[p.image||''],image:p.image||((p.images||[])[0]||''),hidden:p.active===false,featured:Boolean(p.featured)}};
   function localOrder(o){
-    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:[o.address,o.city,o.pin].filter(Boolean).join('\n'),productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[]};}
+    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:[o.address,o.city,o.pin].filter(Boolean).join('\n'),productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[],subtotal:num(o.subtotal),discount:num(o.discount),couponCode:o.couponCode||'',taxableSubtotal:num(o.taxableSubtotal),gstRate:num(o.gstRate),gst:num(o.gst),shipping:num(o.shipping),total:num(o.total)};}
     return o;
   }
 
@@ -1266,7 +1338,7 @@ async function restoreServerBackup(){
   window.saveRoleSetting=async function(){try{await saveSettingPatch({role:document.getElementById('roleSel')?.value||'Super Admin'},'Role saved and enforced on server');closeModal()}catch(e){toast(e.message)}};
 
   function orderRevenue(o){if(Number.isFinite(Number(o.total)))return num(o.total);if(Array.isArray(o.items))return o.items.reduce((s,it)=>s+num(it.price)*Math.max(1,num(it.qty)),0)+num(o.shipping);return num(o.price)*Math.max(1,num(o.qty));}
-  window.invoiceById=function(id){const o=(state.orders||[]).find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}const items=Array.isArray(o.items)?o.items:[];const lines=items.length?items.map(it=>`${it.name||'Product'} | SKU: ${it.sku||'—'} | Size: ${it.size||'—'} | Qty: ${Math.max(1,num(it.qty))} | Unit: ${money(num(it.price))}`).join('\n'):`${prod(o.productId)?.name||'Product'} | Qty: ${Math.max(1,num(o.qty))}`;downloadText('YOUR_TYPE_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.txt',`YOUR TYPE INVOICE\nOrder: ${o.id}\nCustomer: ${o.customer}\nEmail: ${o.email||''}\nPhone: ${o.phone||''}\nItems:\n${lines}\nSubtotal: ${money(o.subtotal!=null?o.subtotal:orderRevenue(o))}\nDiscount: ${money(o.discount||0)}\nGST: ${money(o.gst||0)} (${num(o.gstRate||state.settings?.gst||0)}%)\nShipping: ${money(o.shipping||0)}\nTotal: ${money(o.total!=null?o.total:orderRevenue(o))}\nPayment: ${o.payment||''}\nStatus: ${o.status||''}\nAddress:\n${o.address||''}`)};
+  window.invoiceById=function(id){const o=(state.orders||[]).find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'invoice'),'application/pdf')};
   window.invoice=function(){if(state.orders?.[0])window.invoiceById(state.orders[0].id);else toast('No order available')};
   window.downloadOrders=function(){const rows=(state.orders||[]).map(o=>{const items=Array.isArray(o.items)?o.items:[];return [o.id||'',o.customer||'',items.map(it=>it.name||'').join(' | '),items.map(it=>it.size||'').join(' | '),items.reduce((s,it)=>s+Math.max(1,num(it.qty)),0),orderRevenue(o),o.status||''].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')});downloadText('YOUR_TYPE_ORDERS.csv','Order,Customer,Products,Sizes,Qty,Total,Status\n'+rows.join('\n'),'text/csv')};
   window.downloadReport=function(){const g=num(state.settings?.gst||5),live=(state.orders||[]).filter(o=>o.status!=='Cancelled'),rev=live.reduce((s,o)=>s+orderRevenue(o),0),gst=live.reduce((s,o)=>s+num(o.gst||0),0),profit=live.reduce((s,o)=>{const cost=(o.items||[]).reduce((a,it)=>a+num(prod(it.productId||'')?.cost)*Math.max(1,num(it.qty)),0);return s+orderRevenue(o)-num(o.gst||0)-cost},0);downloadText('YOUR_TYPE_SALES_REPORT.csv','Date,Orders,Revenue,GST Collected,Profit (Est.)\n'+new Date().toLocaleDateString('en-IN')+','+live.length+','+rev.toFixed(2)+','+gst.toFixed(2)+','+profit.toFixed(2),'text/csv')};

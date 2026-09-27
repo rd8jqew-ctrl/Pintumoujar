@@ -136,7 +136,7 @@ async function api(req,res,p){
    // Prices are treated as GST-inclusive, so GST is extracted for reporting and does not change the customer-facing total.
    const gst=gstRate>0?Math.round(taxableSubtotal*gstRate/(100+gstRate)):0;
    const total=taxableSubtotal+shipping;
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:false,awb:'',courier:'',tracking_url:''};
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:''};
    db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total},'application/json',origin);
   }
   if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items},'application/json',origin)}

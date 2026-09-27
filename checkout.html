@@ -37,6 +37,7 @@
     <div id="summary"></div>
     <div class="billLines">
       <div><span>Subtotal</span><b id="sumSubtotal">₹0</b></div>
+      <div id="sumDiscountRow" style="display:none"><span id="sumDiscountLabel">Discount</span><b id="sumDiscount" style="color:#7ee787">-₹0</b></div>
       <div><span>Shipping</span><b id="sumShipping">₹0</b></div>
       <div class="total"><span>Total</span><b id="sumTotal">₹0</b></div>
     </div>
@@ -117,7 +118,8 @@ async function initCheckout(){
   document.getElementById('sumTotal').textContent=money(total);
 }
 initCheckout();
-async function applyCoupon(){const code=document.getElementById('couponCode').value.trim();if(!code)return;try{const r=await fetch('/api/coupons/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,subtotal})});const d=await r.json();if(!r.ok)throw Error(d.error);discount=Number(d.discount||0);appliedCoupon=d.code;total=subtotal-discount+shipping;document.getElementById('sumTotal').textContent=money(total);document.getElementById('couponMsg').textContent='Coupon applied: '+money(discount)+' off';}catch(e){document.getElementById('couponMsg').textContent=e.message;discount=0;appliedCoupon='';total=subtotal+shipping;document.getElementById('sumTotal').textContent=money(total)}}
+function renderDiscountRow(){const row=document.getElementById('sumDiscountRow');if(!row)return;if(discount>0){row.style.display='';document.getElementById('sumDiscountLabel').textContent='Discount'+(appliedCoupon?' ('+appliedCoupon+')':'');document.getElementById('sumDiscount').textContent='-'+money(discount);}else{row.style.display='none';}}
+async function applyCoupon(){const code=document.getElementById('couponCode').value.trim();if(!code)return;try{const r=await fetch('/api/coupons/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,subtotal})});const d=await r.json();if(!r.ok)throw Error(d.error);discount=Number(d.discount||0);appliedCoupon=d.code;total=subtotal-discount+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total);document.getElementById('couponMsg').textContent='Coupon applied: '+money(discount)+' off';}catch(e){document.getElementById('couponMsg').textContent=e.message;discount=0;appliedCoupon='';total=subtotal+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total)}}
 function showUPIPopup(){
  const note=document.getElementById('upiNote');
  if(note) note.style.display='block';
@@ -136,9 +138,10 @@ async function placeOrder(e){
  const btn=form.querySelector('button[type="submit"]'); if(btn)btn.disabled=true;
  try{const headers={'Content-Type':'application/json'}; if(customerToken)headers.Authorization='Bearer '+customerToken;
   const r=await fetch('/api/orders',{method:'POST',headers,body:JSON.stringify(purchase)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not place order');
-  purchase.orderId=d.orderId; purchase.date=new Date().toISOString();
+  const finalTotal=Number.isFinite(Number(d.total))?Number(d.total):total;
+  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal;
   localStorage.setItem('yourTypeLastPurchase',JSON.stringify(purchase));localStorage.setItem('yourTypeLastOrder',JSON.stringify(purchase));localStorage.removeItem('yourTypeCart');
-  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(total);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
+  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
  }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
 }
 

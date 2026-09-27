@@ -76,7 +76,7 @@ input:focus,select:focus,textarea:focus,.search:focus{border-color:#7c2cff!impor
 /* premium navigation */
 #ytPremiumAdminNav{margin:14px 0 22px!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
 #ytPremiumAdminNav .yt-admin-top{padding:18px 2px 12px!important;margin:0!important;align-items:center!important}
-#ytPremiumAdminNav .yt-kicker{color:#8b5cf6!important;letter-spacing:2.2px!important;font-weight:800}
+#ytPremiumAdminNav .yt-kicker{color:#c4b5fd!important;letter-spacing:2.2px!important;font-weight:800}
 #ytPremiumAdminNav .yt-title{font-size:30px!important;letter-spacing:-.04em!important}
 #ytPremiumAdminNav .yt-sub{color:#7f8a9b!important}
 #ytPremiumAdminNav .yt-status{border-color:#273244!important;background:#0d141e!important;color:#aab4c2!important}
@@ -156,7 +156,7 @@ input:focus,select:focus,textarea:focus,.search:focus{border-color:#7c2cff!impor
  .wrap{margin-left:270px!important;margin-right:22px!important;padding:0 18px!important;max-width:none!important}
  #ytPremiumAdminNav{position:fixed!important;left:14px!important;top:14px!important;bottom:14px!important;width:238px!important;height:auto!important;margin:0!important;padding:16px!important;overflow:auto!important;background:linear-gradient(180deg,#09111b,#060b12)!important;border:1px solid #1b2838!important;border-radius:20px!important;box-shadow:0 25px 70px rgba(0,0,0,.45)!important;z-index:70!important}
  #ytPremiumAdminNav .yt-admin-top{display:block!important;padding:6px 4px 18px!important}
- #ytPremiumAdminNav .yt-kicker{font-size:10px!important;color:#a855f7!important}
+ #ytPremiumAdminNav .yt-kicker{font-size:10px!important;color:#c4b5fd!important}
  #ytPremiumAdminNav .yt-title{font-size:22px!important;margin-top:6px!important}
  #ytPremiumAdminNav .yt-sub{font-size:11px!important;line-height:1.45!important}
  #ytPremiumAdminNav .yt-status{margin-top:12px!important;display:inline-block!important}
@@ -618,6 +618,8 @@ state.products.forEach(p=>{if(p.hidden===undefined)p.hidden=false;if(p.featured=
 save();
 function prod(id){return state.products.find(p=>p.id===id)}
 function money(n){return '₹'+Number(n||0).toLocaleString('en-IN')}
+function fcEscape(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function esc(v){return fcEscape(v)}
 function go(id,btn){let e=document.getElementById(id);if(!e){toast('Section not found');return}if(!['store','account','customerOrders'].includes(id))localStorage.setItem('ytAdminSection',id);document.querySelectorAll('.section').forEach(x=>x.classList.remove('on'));e.classList.add('on');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');document.getElementById('adminTabs').style.display=['store','account','customerOrders'].includes(id)?'none':'flex';if(id==='store')filterStore('all');if(id==='controlCenter')loadFullControl();if(id==='orders')renderOrders();if(id==='inventory')renderInventory();if(id==='products')renderProducts();if(id==='variants'){syncVariantTab()}if(id==='sections')renderSectionManager();if(id==='colors'){syncColorManager()}if(id==='coupons')renderCoupons();if(id==='customerOrders')renderCustomerOrders();if(id==='music')ytMusicLoad();updateDash();window.scrollTo({top:0,behavior:'smooth'})}
 function adminLogin(){
   openModal(`<h2>Admin Login</h2><form id="adminLoginForm" autocomplete="off" novalidate onsubmit="event.preventDefault();doAdminLogin()">
@@ -696,7 +698,7 @@ function newOrder(id){let p=prod(id),size=bs.value,qty=Math.max(1,+bq2.value||1)
 function orderCard(o){let p=prod(o.productId);return `<div class=order><div style="display:flex;justify-content:space-between"><b>${o.id}</b><span class=pill>${o.status}</span></div><div class=orderbody><div class=orderimg>YT</div><div><b>${p?.name||'Deleted Product'}</b><br>SKU: ${p?.sku||'—'}<br>Size: <b>${o.size||'—'}</b> · Color: <b>${o.color||'—'}</b> · Qty: <b>${o.qty||1}</b><br>Unit: ${money(o.price)} · Total: <b>${money(o.price*o.qty)}</b><br>Payment: ${o.payment}<br><span class=muted>${o.customer} · ${o.phone}<br>${o.date}</span></div></div><h3>Delivery Address</h3><div class=address>${o.customer}
 ${o.address}
 📞 ${o.phone}</div><p class=small>${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class=muted>AWB: <b>${o.awb}</b>${o.tracking_url?` · <a href="${o.tracking_url}" target="_blank" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class=timeline>${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div>
-<button class="btn good" onclick="setOrderStatus('${o.id}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${o.id}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${o.id}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${o.id}','Delivered')">Delivered</button><button class="btn" onclick="verify('${o.id}')">Verify Address</button><button class="btn" onclick="shipment('${o.id}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${o.id}')">Invoice</button><button class="btn" onclick="addressSlip('${o.id}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${o.id}')">Cancel</button><br><br><button class=btn onclick="details('${o.id}')">Full Details</button></div>`}
+<button class="btn ${o.status==='Packed'?'primary':'good'}" onclick="setOrderStatus('${o.id}','Packed')">Packed</button><button class="btn ${o.status==='Shipped'?'primary':''}" onclick="setOrderStatus('${o.id}','Shipped')">Shipped</button><button class="btn ${o.status==='Out for Delivery'?'primary':''}" onclick="setOrderStatus('${o.id}','Out for Delivery')">Out for Delivery</button><button class="btn ${o.status==='Delivered'?'primary':''}" onclick="setOrderStatus('${o.id}','Delivered')">Delivered</button><button class="btn" onclick="verify('${o.id}')">Verify Address</button><button class="btn" onclick="shipment('${o.id}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${o.id}')">Invoice</button><button class="btn" onclick="addressSlip('${o.id}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${o.id}')">Cancel</button><br><br><button class=btn onclick="details('${o.id}')">Full Details</button></div>`}
 function renderOrders(q=''){let a=state.orders.filter(o=>(o.id+o.customer+(prod(o.productId)?.name||'')).toLowerCase().includes(q.toLowerCase()));ordersList.innerHTML=a.length?a.map(orderCard).join(''):'<p class=muted>No matching orders.</p>'}
 function renderCustomerOrders(){customerOrderList.innerHTML=state.orders.map(orderCard).join('')}
 function setOrderStatus(id,s){let o=state.orders.find(x=>x.id===id);if(o){o.status=s;save();renderOrders();renderCustomerOrders();updateDash();toast('Order status: '+s)}}
@@ -805,10 +807,11 @@ function pdfDoc(width,height){
   const ops=[];
   function txt(x,y,size,str,o={}){const font=o.font||'F1',c=o.color||[0.09,0.09,0.09];let cmd=`BT /${font} ${size} Tf ${c[0]} ${c[1]} ${c[2]} rg`;if(o.spacing)cmd+=` ${o.spacing} Tc`;cmd+=` ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(str)}) Tj ET`;ops.push(cmd)}
   function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;txt(xRight-w,y,size,str,o)}
+  function textCenter(xCenter,y,size,str,o={}){const bold=(o.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;txt(xCenter-w/2,y,size,str,o)}
   function line(x1,y1,x2,y2,o={}){const c=o.color||[0.82,0.82,0.82],w=o.width||0.75;ops.push(`q ${w} w ${c[0]} ${c[1]} ${c[2]} RG ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S Q`)}
   function rect(x,y,w,h,o={}){let cmd='q ';if(o.fill)cmd+=`${o.fill[0]} ${o.fill[1]} ${o.fill[2]} rg `;if(o.stroke)cmd+=`${o.width||0.75} w ${o.stroke[0]} ${o.stroke[1]} ${o.stroke[2]} RG `;cmd+=`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re `;cmd+=o.fill&&o.stroke?'B':o.fill?'f':'S';cmd+=' Q';ops.push(cmd)}
   function build(){const stream=ops.join('\n');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
-  return {txt,textRight,line,rect,build};
+  return {txt,textRight,textCenter,line,rect,build};
 }
 function downloadPDF(){
   const W=595,H=842,M=48,doc=pdfDoc(W,H);let y=H-60;
@@ -829,53 +832,100 @@ function downloadPDF(){
 function buildOrderPdf(o,kind){
   const W=595,H=842,M=48,doc=pdfDoc(W,H);
   const items=Array.isArray(o.items)&&o.items.length?o.items:[{name:prod(o.productId)?.name||'Product',sku:o.sku||prod(o.productId)?.sku||'',size:o.size||'M',color:o.color||'',price:o.price||0,qty:o.qty||1}];
-  let y=H-56;
-  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});
-  doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
-  doc.textRight(W-M,y,16,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
-  doc.textRight(W-M,y-15,9,'Order '+(o.id||'—'),{color:[0.4,0.4,0.4]});
-  y-=34;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=24;
+  const BLACK=[0.06,0.06,0.06],WHITE=[1,1,1],INK=[0.09,0.09,0.09],MUTE=[0.45,0.45,0.45],FAINT=[0.55,0.55,0.55],LINE=[0.82,0.82,0.82],PAPER=[0.965,0.96,0.945];
+  // ---- Header band ----
+  doc.rect(0,H-92,W,92,{fill:BLACK});
+  doc.txt(M,H-40,8,'PREMIUM STREETWEAR',{color:[0.75,0.75,0.75],spacing:1.8});
+  doc.textCenter(W/2,H-46,26,'YOUR TYPE',{font:'F2',color:WHITE});
+  doc.textCenter(W/2,H-64,8,'BUILT DIFFERENT',{color:[0.72,0.72,0.72],spacing:3.2});
+  doc.textRight(W-M,H-40,8,'EST. '+(o.storeEst||'2025'),{color:[0.75,0.75,0.75],spacing:1.4});
+  let y=H-92-46;
+  // ---- Title + meta ----
+  doc.txt(M,y,26,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
+  doc.txt(M,y-16,9,kind==='invoice'?'TAX INVOICE & PAYMENT DETAILS':'ORDER CONFIRMATION & SHIPPING DETAILS',{color:MUTE,spacing:1});
+  const metaX=W-M-190;
   const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-  doc.txt(M,y,7.5,'DATE',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M,y-12,10.5,dateStr,{font:'F2'});
-  doc.txt(M+180,y,7.5,'PAYMENT',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+180,y-12,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
-  doc.txt(M+330,y,7.5,'STATUS',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+330,y-12,10.5,o.status||'New',{font:'F2'});
-  y-=38;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=22;
-  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:[0.4,0.4,0.4],spacing:0.6});y-=16;
-  doc.txt(M,y,11,o.customer||'—',{font:'F2'});y-=14;
-  String(o.address||'—').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:[0.3,0.3,0.3]});y-=13});
-  doc.txt(M,y,10,'Phone: '+(o.phone||'—'),{color:[0.3,0.3,0.3]});y-=13;
-  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:[0.3,0.3,0.3]});y-=13}
-  y-=8;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=20;
-  const col={item:M,sku:M+195,size:M+270,qty:M+330,unit:M+375,total:W-M};
-  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:[0.4,0.4,0.4]});
-  y-=8;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=16;
-  items.forEach(it=>{
+  function metaRow(yy,label,val){doc.txt(metaX,yy,7.5,label,{color:FAINT,spacing:0.8});doc.txt(metaX+82,yy,10,val,{font:'F2'})}
+  metaRow(y+2,'ORDER NO.','#'+(o.id||'—'));
+  metaRow(y-13,'DATE',dateStr);
+  metaRow(y-28,'PAYMENT',String(o.payment||'cod').toUpperCase());
+  doc.txt(metaX,y-43,7.5,'STATUS',{color:FAINT,spacing:0.8});
+  const statusLbl=String(o.status||'New').toUpperCase(),statusW=statusLbl.length*7*0.62+16;
+  doc.rect(metaX+82,y-54,statusW,15,{fill:BLACK});doc.txt(metaX+90,y-50,8,statusLbl,{font:'F2',color:WHITE,spacing:0.6});
+  y-=76;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=26;
+  // ---- Bill To / Ship To / Track boxes ----
+  const boxTop=y,boxH=128,gap=14,boxW=(W-2*M-2*gap)/3;
+  const b1=M,b2=M+boxW+gap,b3=M+2*(boxW+gap);
+  [b1,b2,b3].forEach(bx=>doc.rect(bx,boxTop-boxH,boxW,boxH,{stroke:LINE,width:0.75}));
+  function wrapLines(str,size,maxW){const words=String(str||'').split(/\s+/).filter(Boolean),lines=[];let cur='';words.forEach(w=>{const test=cur?cur+' '+w:w;if(test.length*size*0.5>maxW&&cur){lines.push(cur);cur=w}else{cur=test}});if(cur)lines.push(cur);return lines}
+  function addrBlock(bx,title){let by=boxTop-20;const innerW=boxW-24;doc.txt(bx+14,by,8,title,{font:'F2',color:MUTE,spacing:0.8});by-=18;
+    doc.txt(bx+14,by,10.5,o.customer||'—',{font:'F2'});by-=14;
+    String(o.address||'—').split('\n').forEach(l=>wrapLines(l,9,innerW).forEach(wl=>{doc.txt(bx+14,by,9,wl,{color:[0.3,0.3,0.3]});by-=12}));
+    by-=3;wrapLines('Phone: '+(o.phone||'—'),9,innerW).forEach(wl=>{doc.txt(bx+14,by,9,wl,{color:[0.3,0.3,0.3]});by-=12});
+    if(title==='BILL TO'&&o.email){wrapLines('Email: '+o.email,9,innerW).forEach(wl=>{doc.txt(bx+14,by,9,wl,{color:[0.3,0.3,0.3]});by-=12})}
+  }
+  addrBlock(b1,'BILL TO');addrBlock(b2,'SHIP TO');
+  let ty=boxTop-20;doc.txt(b3+14,ty,8,'TRACK YOUR ORDER',{font:'F2',color:MUTE,spacing:0.8});ty-=18;
+  doc.txt(b3+14,ty,9.5,'Order No.',{color:FAINT});ty-=13;
+  doc.txt(b3+14,ty,10.5,'#'+(o.id||'—'),{font:'F2'});ty-=20;
+  doc.txt(b3+14,ty,8.5,'Visit yourtype.in/track and',{color:[0.35,0.35,0.35]});ty-=11;
+  doc.txt(b3+14,ty,8.5,'enter your order number for',{color:[0.35,0.35,0.35]});ty-=11;
+  doc.txt(b3+14,ty,8.5,'real-time delivery updates.',{color:[0.35,0.35,0.35]});
+  y=boxTop-boxH-26;
+  // ---- Item table ----
+  const col={item:M,sku:M+195,size:M+270,qty:M+335,unit:M+375,total:W-M};
+  doc.rect(M,y-4,W-2*M,18,{fill:[0.93,0.93,0.93]});
+  doc.txt(col.item+6,y,8,'ITEM',{font:'F2',color:MUTE});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:MUTE});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:MUTE});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:MUTE});doc.textRight(col.unit+45,y,8,'UNIT PRICE',{font:'F2',color:MUTE});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:MUTE});
+  y-=14;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=20;
+  items.forEach((it,i)=>{
     const qty=Math.max(1,pdfNum(it.qty)),price=pdfNum(it.price);
-    doc.txt(col.item,y,9.5,String(it.name||'Product').slice(0,24),{font:'F2'});
-    doc.txt(col.sku,y,9.5,it.sku||'—',{color:[0.4,0.4,0.4]});
-    doc.txt(col.size,y,9.5,(it.size||'—')+' / '+(it.color||'—'),{color:[0.4,0.4,0.4]});
+    doc.txt(col.item+6,y,9.5,String(it.name||'Product').slice(0,26),{font:'F2'});
+    doc.txt(col.sku,y,9.5,it.sku||'—',{color:MUTE});
+    doc.txt(col.size,y,9.5,(it.size||'—')+' / '+(it.color||'—'),{color:MUTE});
     doc.txt(col.qty,y,9.5,String(qty));
     doc.textRight(col.unit+45,y,9.5,money(price));
     doc.textRight(col.total,y,9.5,money(price*qty),{font:'F2'});
-    y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
+    y-=20;doc.line(M,y+8,W-M,y+8,{color:[0.9,0.9,0.9],width:0.5});
   });
-  y-=5;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=22;
+  y-=6;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=28;
+  // ---- Notes (left) + Totals box (right) ----
+  const notesW=W-2*M-260,notesTop=y;
+  doc.txt(M,y,8.5,'SPECIAL NOTES',{font:'F2',color:MUTE,spacing:0.8});
+  doc.line(M,y-6,M+notesW,y-6,{color:LINE,width:0.5});
+  let ny=y-24;
+  ['Thank you for choosing YOUR TYPE.','Your support means everything to us.','','— Team YOUR TYPE'].forEach(l=>{doc.txt(M,ny,9.5,l,{color:[0.35,0.35,0.35]});ny-=14});
   const itemsSum=items.reduce((s,it)=>s+pdfNum(it.price)*Math.max(1,pdfNum(it.qty)),0);
   const discount=pdfNum(o.discount),shipping=pdfNum(o.shipping),gst=pdfNum(o.gst);
   const subtotal=o.subtotal||itemsSum,total=o.total||Math.max(0,itemsSum-discount)+shipping;
-  const boxX=W-M-210;
-  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||[0.45,0.45,0.45]});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.15]});y-=15}
-  totalRow('Subtotal',money(subtotal));
-  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]});
-  if(gst>0)totalRow('GST ('+(o.gstRate||0)+'%, incl. in price)',money(gst));
-  totalRow('Shipping',shipping>0?money(shipping):'FREE');
-  y-=3;doc.line(boxX,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=18;
-  doc.txt(boxX,y,12,'TOTAL',{font:'F2'});doc.textRight(W-M,y,14,money(total),{font:'F2'});
-  y-=32;
-  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});y-=14;
-  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]});y-=14}
-  y-=14;doc.line(M,y,W-M,y,{color:[0.9,0.9,0.9],width:0.75});y-=18;
-  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:[0.55,0.55,0.55]});
+  const boxW2=240,boxX=W-M-boxW2;let ty2=y;const rows=[];
+  rows.push(['Subtotal',money(subtotal),{}]);
+  if(discount>0)rows.push(['Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]}]);
+  if(gst>0)rows.push(['GST ('+(o.gstRate||0)+'%, incl. in price)',money(gst),{}]);
+  rows.push(['Shipping',shipping>0?money(shipping):'FREE',{}]);
+  const rowsH=rows.length*22+8,totalBarH=34;
+  doc.rect(boxX,ty2-rowsH,boxW2,rowsH,{fill:[0.94,0.94,0.94]});
+  ty2-=18;
+  rows.forEach(([label,val,co])=>{doc.txt(boxX+14,ty2,9.5,label,{color:co.color||MUTE});doc.textRight(boxX+boxW2-14,ty2,9.5,val,{font:'F2',color:co.color||INK});ty2-=22});
+  ty2=y-rowsH-totalBarH;
+  doc.rect(boxX,ty2,boxW2,totalBarH,{fill:BLACK});
+  doc.txt(boxX+14,ty2+11,12,'TOTAL',{font:'F2',color:WHITE});
+  doc.textRight(boxX+boxW2-14,ty2+11,15,money(total),{font:'F2',color:WHITE});
+  y=Math.min(ny,ty2)-24;
+  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});
+  if(o.awb){y-=14;doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]})}
+  y-=24;doc.line(M,y,W-M,y,{color:[0.85,0.85,0.85],width:0.75});y-=20;
+  // ---- Footer feature strip ----
+  const featW=(W-2*M)/3;
+  [['PREMIUM QUALITY','Crafted for everyday comfort & style.'],['WORLDWIDE SHIPPING','Bringing streetwear to your doorstep.'],['SUSTAINABLE CHOICES','Better fashion. A cleaner tomorrow.']].forEach((f,i)=>{const fx=M+i*featW;doc.txt(fx,y,8.5,f[0],{font:'F2'});doc.txt(fx,y-12,8,f[1],{color:MUTE})}); 
+  y-=40;doc.line(M,y,W-M,y,{color:[0.85,0.85,0.85],width:0.75});y-=26;
+  // ---- Footer brand + barcode ----
+  doc.txt(M,y,15,'YOUR TYPE',{font:'F2'});doc.txt(M,y-12,7.5,'BUILT DIFFERENT',{color:MUTE,spacing:1.4});
+  doc.textRight(W-M,y-4,10,'Thank you for your order',{font:'F2'});
+  y-=34;
+  const barX=M,barCode=String(o.id||'0000');let bx2=barX;
+  for(let i=0;i<barCode.length*3;i++){const wbar=(i%5===0)?2.2:1;doc.rect(bx2,y-2,wbar,16,{fill:[0.1,0.1,0.1]});bx2+=wbar+2}
+  doc.txt(barX,y-16,7.5,String(o.id||'—'),{color:MUTE,spacing:1});
+  doc.textRight(W-M,y-2,8.5,'This is a computer-generated document.',{color:FAINT});
   return doc.build();
 }
 function addressSlip(id){let o=state.orders.find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_PACKING_SLIP_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'slip'),'application/pdf')}
@@ -1240,7 +1290,7 @@ async function restoreServerBackup(){
   window.newOrder=async function(id){const p=productById(id),size=document.getElementById('bs')?.value,qty=Math.max(1,num(document.getElementById('bq2')?.value)),customer=(document.getElementById('bcustomer')?.value||'').trim(),phone=(document.getElementById('bphone')?.value||'').trim(),address=(document.getElementById('baddress')?.value||'').trim();if(!p||!size){toast('Select a product and size');return}if(!customer||!phone||!address){toast('Customer, phone and address are required');return}const m=address.match(/(?:^|\n)\s*(?:.*?)(?:-|—)\s*(\d{6})\s*$/);const pin=m?m[1]:(address.match(/\b\d{6}\b/)||[])[0]||'';try{await api2('/api/orders',{method:'POST',body:JSON.stringify({name:customer,email:'admin-order@yourtype.local',phone,address,city:'',pin,items:[{name:p.name,image:p.image,size,qty}]})});await sync();closeModal();go('orders');toast('Order placed on website')}catch(e){toast(e.message)}};
 
   // Render order cards with server-shape-safe data, avoiding undefined/NaN.
-  window.orderCard=function(o){const p=productById(o.productId),qty=Math.max(1,num(o.qty)),price=num(o.price),imgProduct=p||{name:o.items?.[0]?.name||'Product',image:o.image||o.items?.[0]?.image||'',images:o.image||o.items?.[0]?.image?[o.image||o.items?.[0]?.image]:[]};return `<div class="order"><div style="display:flex;justify-content:space-between"><b>${esc(o.id||'—')}</b><span class="pill">${esc(o.status||'New')}</span></div><div class="orderbody"><div class="orderimg">${picHtml(imgProduct)}</div><div><b>${esc(p?.name||'Product')}</b><br>SKU: ${esc(p?.sku||'—')}<br>Size: <b>${esc(o.size||'—')}</b> · Color: <b>${esc(o.color||'—')}</b> · Qty: <b>${qty}</b><br>Unit: ${money(price)} · Total: <b>${money(price*qty)}</b><br>Payment: ${esc(o.payment||'COD')}<br><span class="muted">${esc(o.customer||'—')} · ${esc(o.phone||'—')}<br>${esc(o.date||'—')}</span></div></div><h3>Delivery Address</h3><div class="address">${esc(o.customer||'—')}\n${esc(o.address||'—')}\n📞 ${esc(o.phone||'—')}</div><p class="small">${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class="muted">AWB: <b>${esc(o.awb)}</b>${o.tracking_url?` · <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class="timeline">${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div><button class="btn good" onclick="setOrderStatus('${esc(o.id)}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${esc(o.id)}','Delivered')">Delivered</button><button class="btn" onclick="verify('${esc(o.id)}')">Verify Address</button><button class="btn" onclick="shipment('${esc(o.id)}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${esc(o.id)}')">Invoice</button><button class="btn" onclick="addressSlip('${esc(o.id)}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${esc(o.id)}')">Cancel</button><br><br><button class="btn" onclick="details('${esc(o.id)}')">Full Details</button><button class="btn danger" onclick="deleteOrder('${esc(o.id)}')">Delete Order</button></div>`};
+  window.orderCard=function(o){const p=productById(o.productId),qty=Math.max(1,num(o.qty)),price=num(o.price),imgProduct=p||{name:o.items?.[0]?.name||'Product',image:o.image||o.items?.[0]?.image||'',images:o.image||o.items?.[0]?.image?[o.image||o.items?.[0]?.image]:[]};return `<div class="order"><div style="display:flex;justify-content:space-between"><b>${esc(o.id||'—')}</b><span class="pill">${esc(o.status||'New')}</span></div><div class="orderbody"><div class="orderimg">${picHtml(imgProduct)}</div><div><b>${esc(p?.name||'Product')}</b><br>SKU: ${esc(p?.sku||'—')}<br>Size: <b>${esc(o.size||'—')}</b> · Color: <b>${esc(o.color||'—')}</b> · Qty: <b>${qty}</b><br>Unit: ${money(price)} · Total: <b>${money(price*qty)}</b><br>Payment: ${esc(o.payment||'COD')}<br><span class="muted">${esc(o.customer||'—')} · ${esc(o.phone||'—')}<br>${esc(o.date||'—')}</span></div></div><h3>Delivery Address</h3><div class="address">${esc(o.customer||'—')}\n${esc(o.address||'—')}\n📞 ${esc(o.phone||'—')}</div><p class="small">${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class="muted">AWB: <b>${esc(o.awb)}</b>${o.tracking_url?` · <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class="timeline">${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div><button class="btn ${o.status==='Packed'?'primary':'good'}" onclick="setOrderStatus('${esc(o.id)}','Packed')">Packed</button><button class="btn ${o.status==='Shipped'?'primary':''}" onclick="setOrderStatus('${esc(o.id)}','Shipped')">Shipped</button><button class="btn ${o.status==='Out for Delivery'?'primary':''}" onclick="setOrderStatus('${esc(o.id)}','Out for Delivery')">Out for Delivery</button><button class="btn ${o.status==='Delivered'?'primary':''}" onclick="setOrderStatus('${esc(o.id)}','Delivered')">Delivered</button><button class="btn" onclick="verify('${esc(o.id)}')">Verify Address</button><button class="btn" onclick="shipment('${esc(o.id)}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${esc(o.id)}')">Invoice</button><button class="btn" onclick="addressSlip('${esc(o.id)}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${esc(o.id)}')">Cancel</button><br><br><button class="btn" onclick="details('${esc(o.id)}')">Full Details</button><button class="btn danger" onclick="deleteOrder('${esc(o.id)}')">Delete Order</button></div>`};
 
   window.syncAdminNow=sync;
   window.addEventListener('load',()=>{if(getAdminToken()){sync().then(()=>{const saved=localStorage.getItem('ytAdminSection');if(saved&&document.getElementById(saved))go(saved)}).catch(e=>toast(e.message))}});

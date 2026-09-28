@@ -195,10 +195,48 @@ async function api(req,res,p){
      const district=String(nAddr.state_district||nAddr.county||b?.localityInfo?.administrative?.[3]?.name||'').trim();
      const road=String(nAddr.road||'').trim();
      const houseNumber=String(nAddr.house_number||'').trim();
+
+     // Build a useful list of locality/area names around the GPS point.
+     // These are suggestions only: they are never treated as the customer's
+     // exact address and never used to overwrite the customer's PIN.
+     const nearbyAreas=[];
+     const addArea=(name,type='area')=>{
+       const value=String(name||'').trim();
+       if(!value)return;
+       const key=value.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+       if(!key)return;
+       if(/^delhi$|^new delhi$|^india$/i.test(value))return;
+       if([city,state,'India'].some(x=>String(x||'').trim().toLowerCase()===key))return;
+       if(nearbyAreas.some(x=>x.key===key))return;
+       nearbyAreas.push({name:value,type});
+       nearbyAreas[nearbyAreas.length-1].key=key;
+     };
+     addArea(nAddr.neighbourhood,'neighbourhood');
+     addArea(nAddr.suburb,'suburb');
+     addArea(nAddr.quarter,'locality');
+     addArea(nAddr.village,'village');
+     addArea(nAddr.town,'town');
+     addArea(nAddr.city_district,'locality');
+     addArea(b?.locality,'locality');
+     addArea(b?.city,'city');
+     for(const item of (Array.isArray(b?.localityInfo?.administrative)?b.localityInfo.administrative:[])){
+       addArea(item?.name,item?.description||'administrative area');
+     }
+     for(const item of (Array.isArray(b?.localityInfo?.informative)?b.localityInfo.informative:[])){
+       addArea(item?.name,item?.description||'nearby area');
+     }
+     // Nominatim can return the same locality under different address keys.
+     // Collect every useful locality-level name so the checkout can show the
+     // customer's area plus nearby/administrative names without guessing a PIN.
+     for(const key of ['city_district','district','county','state_district']){
+       addArea(nAddr[key],key.replace('_',' '));
+     }
+     addArea(district,'district');
+     for(const item of nearbyAreas)delete item.key;
      const source=n&&b?'nominatim+bigdatacloud':(n?'nominatim':'bigdatacloud');
      return send(res,200,{
        displayName:String(n?.display_name||[b?.locality,b?.city,b?.principalSubdivision,b?.postcode].filter(Boolean).join(' · ')||''),
-       pin,state,city,locality,district,address:[houseNumber,road].filter(Boolean).join(', '),source,
+       pin,state,city,locality,district,nearbyAreas:nearbyAreas.slice(0,10),address:[houseNumber,road].filter(Boolean).join(', '),source,
        pinConfidence,pinConflict,nominatimPin:nPin,bigDataCloudPin:bPin
      },'application/json',origin);
    }catch(e){return send(res,503,{error:'Location address lookup is temporarily unavailable. Please enter the address manually.'},'application/json',origin)}

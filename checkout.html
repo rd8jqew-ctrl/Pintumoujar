@@ -6,7 +6,47 @@
 <title>Checkout — YOUR TYPE</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
-<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}.gpsPanel{border:1px solid #242424;padding:10px 12px;margin:8px 0 12px;font-size:10px;line-height:1.6;color:#aaa}.gpsPanel strong{color:#eee}.gpsPanel.ok{border-color:#315c3a}.gpsPanel.warn{border-color:#6a5528}.gpsPanel.error{border-color:#5e3030}.gpsMeta{display:block;color:#777;font-size:9px;margin-top:3px}.gpsUseBtn{margin-top:7px;border:1px solid #444;background:#111;color:#ddd;padding:6px 8px;font:inherit;font-size:9px;cursor:pointer}.gpsUseBtn:hover{border-color:#777;color:#fff}.gpsAreas{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.gpsAreaTag{border:1px solid #292929;background:#0d0d0d;color:#aaa;padding:4px 7px;font-size:8px;letter-spacing:.2px}.gpsAreaTag.primary{border-color:#3c6b46;color:#d9f7df}.gpsPins{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.gpsPinBtn{border:1px solid #3a3a3a;background:#111;color:#eee;padding:7px 9px;border-radius:2px;font:inherit;font-size:9px;line-height:1.2;cursor:pointer;text-align:left}.gpsPinBtn:hover{border-color:#888;background:#171717}.gpsPinBtn.selected{border-color:#3c6b46;color:#d9f7df}.gpsPinBtn small{display:block;color:#777;font-size:7px;margin-top:2px}.gpsPinNote{display:block;color:#777;font-size:8px;margin-top:5px}.gpsHint{display:block;color:#777;font-size:9px;margin-top:5px}</style>
+<style>
+.ad{grid-column:1/-1;display:grid;gap:14px}
+.ad *{box-sizing:border-box}
+.adRow{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.form .ad label.adField{display:grid!important;gap:7px;align-items:stretch!important;min-width:0;padding:0!important;min-height:0!important;border:0!important;background:none!important;cursor:default!important}
+.form .ad label.adField[hidden]{display:none!important}
+.form .ad .adNear[hidden]{display:none!important}
+.form>div:first-child{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.form>div:first-child small{grid-column:1/-1;font-size:12px;color:#8a8a8a}
+.form>div:first-child button{height:54px;padding:0 20px;background:transparent;border:1px solid #3a3a3a;color:#eee;font:inherit;font-size:10px;letter-spacing:2px;cursor:pointer}
+.form>div:first-child button:hover{background:#151515;border-color:#777}
+.form>div:first-child input{grid-column:auto}
+.adField>span{font-size:9px;letter-spacing:2.4px;color:#8a8a8a;text-transform:uppercase}
+.adField>span em{font-style:normal;color:#555;letter-spacing:1px}
+.ad select,.ad input:not([type=hidden]){width:100%;height:54px;padding:0 16px;background:#0d0d0d;border:1px solid #292929;color:#f4f4f4;font:inherit;font-size:14px;outline:none;border-radius:0;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
+.ad select{background-image:linear-gradient(45deg,transparent 50%,#888 50%),linear-gradient(135deg,#888 50%,transparent 50%);background-position:calc(100% - 20px) 24px,calc(100% - 14px) 24px;background-size:6px 6px;background-repeat:no-repeat;padding-right:38px}
+.ad input:-webkit-autofill{-webkit-box-shadow:0 0 0 60px #0d0d0d inset;-webkit-text-fill-color:#f4f4f4}
+.ad select:focus,.ad input:focus{border-color:#8a8a8a;box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+.ad input.ok{border-color:#2f5d3a}.ad input.bad{border-color:#7a2f2f}
+.adPin input{font-size:20px;letter-spacing:5px;font-weight:600}
+.adLoc{height:54px;padding:0 18px;background:transparent;border:1px solid #3a3a3a;color:#eee;font:inherit;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:background .2s,border-color .2s}
+.adLoc:hover{background:#151515;border-color:#777}.adLoc[disabled]{opacity:.5;cursor:wait}
+.adStatus{min-height:18px;font-size:12px;line-height:1.5;color:#8a8a8a}.adStatus.ok{color:#7ee787}.adStatus.err{color:#ff8a80}
+.adNear{display:grid;gap:9px}.adNear p{margin:0;font-size:9px;letter-spacing:2.4px;color:#8a8a8a;text-transform:uppercase}
+.adChips{display:flex;flex-wrap:wrap;gap:9px}
+.adChip{padding:10px 14px;background:#0d0d0d;border:1px solid #2c2c2c;color:#eee;font:inherit;text-align:left;cursor:pointer;line-height:1.35;transition:border-color .2s,background .2s}
+.adChip b{display:block;font-size:15px;letter-spacing:2px}.adChip small{color:#888;font-size:10.5px}
+.adChip:hover,.adChip.on{border-color:#cfcfcf;background:#141414}
+.adGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.adRow{grid-template-columns:1fr}.adGrid{grid-template-columns:1fr}.adLoc{width:100%}}
+.adSum{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px;background:linear-gradient(180deg,#101410,#0c0f0c);border:1px solid #2f5d3a}
+.adSum[hidden]{display:none!important}
+.adTick{width:26px;height:26px;border-radius:50%;background:#2f5d3a;color:#fff;display:grid;place-items:center;font-size:13px}
+.adSum b{display:block;font-size:14px;font-weight:600;letter-spacing:.3px;color:#f4f4f4}.adSum small{color:#8a8a8a;font-size:12px}
+.adSum button{background:none;border:0;color:#aaa;font:inherit;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-decoration:underline;padding:6px}
+.adGrid[hidden]{display:none!important}
+.adChip.on::after{content:" ✓";color:#7ee787}
+.adChip{min-width:140px}
+.trustRow{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;margin:6px 0 2px;font-size:11px;letter-spacing:1px;color:#8a8a8a}
+.adNear p{color:#cfcfcf}
+</style>
 </head>
 <body>
 <div class="shipping"><div class="shipping-track"><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span></div></div>
@@ -33,26 +73,29 @@
       <input id="customerName" required placeholder="Full name" autocomplete="name">
       <input id="customerEmail" required type="email" placeholder="Email address" autocomplete="email">
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
-      <div class="addressHead"><h3>Shipping / Billing Address</h3><button type="button" class="locationBtn" id="useLocationBtn">⌖ USE CURRENT LOCATION</button></div>
-      <div id="locationStatus" class="pinStatus" aria-live="polite" hidden></div><div id="gpsPanel" class="gpsPanel" hidden aria-live="polite"></div>
-      <label class="fieldLabel" for="customerAddress">Address</label>
-      <input id="customerAddress" required placeholder="House / Flat, Street, Area" autocomplete="street-address">
-      <div><label class="fieldLabel" for="customerPin">PIN code</label><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="postal-code" aria-describedby="pinStatus"></div>
-      <div id="pinStatus" class="pinStatus" aria-live="polite">Enter your 6-digit PIN code to detect City and State automatically.</div>
-      <div class="two">
-        <div><label class="fieldLabel" for="customerCity">City / Town</label><select id="customerCity" required autocomplete="address-level2" disabled><option value="" selected>Select city / town</option></select></div>
-        <div><label class="fieldLabel" for="customerState">State / Union Territory</label>
-          <select id="customerState" required autocomplete="address-level1">
-            <option value="" selected disabled>Select your state / UT</option>
-            <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option>
-            <option>Andaman and Nicobar Islands</option><option>Chandigarh</option><option>Dadra and Nagar Haveli and Daman and Diu</option><option>Delhi</option><option>Jammu and Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option>
-          </select>
+      <h3>Delivery address</h3>
+      <section class="ad" id="adBox" aria-label="Delivery address">
+        <div class="adRow">
+          <label class="adField adPin"><span>PIN code</span><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit PIN" autocomplete="postal-code"></label>
+          <button type="button" class="adLoc" id="adLocBtn">◎ Find my PIN</button>
         </div>
-      </div>
+        <div class="adStatus" id="adStatus" role="status" aria-live="polite"></div>
+        <div class="adNear" id="adNear" hidden></div>
+        <div class="adSum" id="adSum" hidden><span class="adTick">✓</span><div><b id="adSumMain"></b><small id="adSumSub"></small></div><button type="button" id="adEdit">Change</button></div>
+        <div class="adGrid" id="adGrid">
+          <label class="adField"><span>State</span><select id="customerState" required autocomplete="address-level1"><option value="">Select state</option></select></label>
+          <label class="adField"><span>City / District</span><input id="customerCity" required placeholder="City" autocomplete="address-level2"></label>
+        </div>
+        <label class="adField" id="adAreaWrap" hidden><span>Area / Locality</span><select id="customerArea"></select></label>
+        <label class="adField"><span>House / Flat / Street</span><input id="customerHouse" required placeholder="e.g. 12, 2nd floor, Rose Apartments, MG Road" autocomplete="address-line1"></label>
+        <label class="adField"><span>Landmark <em>(optional)</em></span><input id="customerLandmark" placeholder="Near temple, opposite school..." autocomplete="off"></label>
+        <input type="hidden" id="customerAddress">
+      </section>
       <h3>Payment method</h3>
       <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
       <small id="upiNote" style="display:none;color:#888;line-height:1.6">UPI option is enabled. Online gateway connection will be added later.</small>
+      <p class="trustRow"><span>🔒 Secure checkout</span><span>↩ 7-day returns</span><span>🚚 Ships in 1–3 days</span></p>
       <button class="checkout" type="submit">PLACE ORDER&nbsp;&nbsp; →</button>
     </form>
   </div>
@@ -63,7 +106,6 @@
       <div><span>Subtotal</span><b id="sumSubtotal">₹0</b></div>
       <div id="sumDiscountRow" style="display:none"><span id="sumDiscountLabel">Discount</span><b id="sumDiscount" style="color:#7ee787">-₹0</b></div>
       <div><span>Shipping</span><b id="sumShipping">₹0</b></div>
-      <div id="sumGstRow" style="display:none"><span>GST included</span><b id="sumGst">₹0</b></div>
       <div class="total"><span>Total</span><b id="sumTotal">₹0</b></div>
     </div>
   </aside>
@@ -75,7 +117,7 @@
     <button class="orderClose" type="button" aria-label="Close" onclick="closeOrderModal()">×</button>
     <div class="orderMark">✓</div>
     <p class="eyebrow">YOUR TYPE / ORDER COMPLETE</p>
-    <h2 id="orderCompleteTitle">Order<br>confirmed.</h2>
+    <h2 id="orderCompleteTitle">Complete<br>your order.</h2>
     <p class="orderLead">Your order is confirmed.<br>Your Type is on its way to you.</p>
     <div class="orderMeta">
       <div><span>ORDER</span><b id="doneOrderId">—</b></div>
@@ -83,9 +125,8 @@
     </div>
     <div class="orderActions">
       <button type="button" class="orderPrimary" onclick="continueShopping()">CONTINUE SHOPPING <span>→</span></button>
-      <button type="button" class="orderSecondary" onclick="viewOrderDetails()">VIEW DETAILS</button>
+      <button type="button" class="orderSecondary" onclick="closeOrderModal()">VIEW DETAILS</button>
     </div>
-    <div id="orderDetailsPanel" class="orderDetailsPanel" hidden></div>
     <p class="orderFine">THANK YOU FOR CHOOSING YOUR TYPE.</p>
   </section>
 </div>
@@ -108,38 +149,6 @@
 .orderPrimary{flex:1;border:1px solid #eee;background:#eee;color:#080808}
 .orderSecondary{border:1px solid #333;background:#0b0b0b;color:#ddd}
 .orderFine{color:#555;font-size:8px;letter-spacing:2px;margin:24px 0 0}
-
-.orderDetailsPanel{margin-top:24px;border-top:1px solid #242424;padding-top:22px;max-height:min(62vh,620px);overflow:auto;text-align:left}
-.orderDetailsPanel[hidden]{display:none}
-.detailTop{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
-.detailTop h3{margin:0;color:#f4f4f4;font-size:18px;letter-spacing:-.4px}
-.detailStatus{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid #444;padding:7px 9px;color:#ddd}
-.detailGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-.detailBox{border:1px solid #242424;padding:12px;background:#0e0e0e}
-.detailBox span{display:block;color:#666;font-size:8px;letter-spacing:1.5px;margin-bottom:5px;text-transform:uppercase}
-.detailBox b,.detailBox div{color:#ddd;font-size:11px;line-height:1.5;white-space:pre-line}
-.detailItems{border-top:1px solid #242424;border-bottom:1px solid #242424}
-.detailItem{display:grid;grid-template-columns:48px 1fr auto;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid #1b1b1b}
-.detailItem:last-child{border-bottom:0}
-.detailItem img{width:48px;height:58px;object-fit:cover;background:#151515}
-.detailItem b{font-size:11px;color:#eee}
-.detailItem small{display:block;color:#777;font-size:9px;line-height:1.5;margin-top:3px}
-.detailItem strong{font-size:11px;color:#eee;white-space:nowrap}
-.detailTotals{margin-top:16px}
-.detailTotals>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;color:#888;font-size:10px}
-.detailTotals .discountValue{color:#7ee787}
-.detailTotals .gstValue{color:#aaa}
-.detailTotals .grand{border-top:1px solid #444;margin-top:5px;padding-top:10px;color:#eee;font-size:13px}
-.detailAddress{margin-top:18px;border:1px solid #242424;padding:13px;background:#0e0e0e}
-.detailAddress h4{margin:0 0 8px;color:#777;font-size:8px;letter-spacing:1.5px}
-.detailAddress div{color:#ddd;font-size:10px;line-height:1.65;white-space:pre-line}
-.detailActions{display:flex;gap:8px;margin-top:18px}
-.detailActions button{min-height:42px;padding:0 14px;font:inherit;font-size:9px;letter-spacing:1.2px;cursor:pointer}
-.detailBack{border:1px solid #333;background:#0b0b0b;color:#ddd}
-.detailTrack{border:1px solid #eee;background:#eee;color:#080808;flex:1}
-.detailLoading{color:#777;font-size:10px;padding:14px 0}
-@media(max-width:600px){.detailGrid{grid-template-columns:1fr}.detailTop{flex-direction:column}.detailActions{flex-direction:column}.detailTrack{flex:auto}}
-
 @media(max-width:600px){
   .orderModal{padding:14px}
   .orderCard{padding:28px 22px 22px}
@@ -147,21 +156,6 @@
   .orderActions{flex-direction:column}
   .orderSecondary{min-height:44px}
 }
-
-.invoiceNote{color:#777;font-size:9px;line-height:1.5;margin-top:14px}
-.detailActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
-.detailActions button{min-height:42px;padding:0 13px;font:inherit;font-size:9px;letter-spacing:1.2px;cursor:pointer}
-.detailBack{border:1px solid #333;background:#0b0b0b;color:#aaa}
-.detailTrack{border:1px solid #eee;background:#eee;color:#080808}
-.detailInvoice{border:1px solid #555;background:#151515;color:#eee}
-.detailAddress{border-top:1px solid #242424;margin-top:16px;padding-top:16px}
-.detailAddress h4{font-size:9px;letter-spacing:1.8px;color:#666;margin:0 0 7px}
-.detailAddress div{color:#ccc;font-size:10px;line-height:1.6;white-space:pre-line}
-.detailLoading{color:#777;font-size:10px;line-height:1.6;padding:10px 0}
-.discountValue{color:#b8b8b8!important}
-.gstValue{display:flex;justify-content:space-between;gap:12px;padding:5px 0;color:#bbb;font-size:10px;border-top:1px solid #242424;margin-top:4px;padding-top:9px}
-.detailTotals .grand{border-top:1px solid #444;margin-top:8px;padding-top:11px;color:#eee;font-size:12px}
-@media(max-width:520px){.orderCard{padding:28px 20px}.detailGrid{grid-template-columns:1fr}.orderActions{flex-direction:column}.detailActions{flex-direction:column}.detailActions button{width:100%}}
 </style>
 
 <script>
@@ -172,206 +166,10 @@ let checkoutSettings={shipping:99,freeShipping:Infinity};
 const priceOf=p=>Number(String(p?.[1]??p?.price??0).replace(/[^0-9]/g,''))||0;
 const summary=document.getElementById('summary');
 if(!cart.length){summary.innerHTML='<p style="color:#777;font-size:11px;line-height:1.7">Your bag is empty. <a href="index.html">Return to shop</a>.</p>';document.querySelector('.checkout').disabled=true;}
-else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
+else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
 let subtotal=cart.reduce((s,p)=>s+priceOf(p)*Number(p.qty||1),0);
 let shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
 let discount=0,appliedCoupon=''; let total=subtotal+shipping;
-let pinLookup={pin:'',state:'',cities:[]};
-let pinLookupTimer=0;
-function setPinStatus(message,type=''){const el=document.getElementById('pinStatus');if(!el)return;el.textContent=message;el.className='pinStatus'+(type?' '+type:'');}
-function resetLocationFromPin(){
-  pinLookup={pin:'',state:'',cities:[]};
-  const city=document.getElementById('customerCity'),state=document.getElementById('customerState');
-  if(city){city.innerHTML='<option value="" selected>Select city / town</option>';city.value='';city.disabled=true;}
-  if(state)state.value='';
-  setPinStatus('Enter your 6-digit PIN code to detect City and State automatically.');
-}
-async function lookupPinCode(force=false){
-  const pin=String(document.getElementById('customerPin')?.value||'').replace(/\D/g,'').slice(0,6);
-  const pinEl=document.getElementById('customerPin');if(pinEl&&pinEl.value!==pin)pinEl.value=pin;
-  if(pin.length!==6){if(force||pin.length===0)resetLocationFromPin();return;}
-  if(!force&&pinLookup.pin===pin&&pinLookup.state)return;
-  clearTimeout(pinLookupTimer);setPinStatus('Detecting City and State from PIN…','loading');
-  const city=document.getElementById('customerCity'),state=document.getElementById('customerState');
-  try{
-    const r=await fetch('/api/pincode/'+encodeURIComponent(pin),{cache:'no-store'});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||'PIN code not found');
-    const cities=[...new Set((Array.isArray(d.cities)?d.cities:[]).map(v=>String(v).trim()).filter(Boolean))];
-    const detectedState=String(d.state||'').trim();
-    if(!detectedState||!cities.length)throw new Error('Location could not be detected for this PIN');
-    pinLookup={pin,state:detectedState,cities};
-    if(state){state.value=detectedState;}
-    if(city){city.innerHTML='<option value="" disabled>Select city / town</option>'+cities.map(v=>'<option value="'+escDetail(v)+'">'+escDetail(v)+'</option>').join('');city.disabled=false;city.value=cities[0];}
-    setPinStatus('✓ Auto-detected: '+cities.join(', ')+' · '+detectedState,'ok');
-    refreshCheckoutStep();
-  }catch(err){
-    pinLookup={pin:'',state:'',cities:[]};
-    if(city){city.innerHTML='<option value="" selected>Select city / town</option>';city.value='';city.disabled=true;}
-    if(state)state.value='';
-    setPinStatus(err.message||'Could not detect this PIN. Please check the PIN and try again.','error');
-    refreshCheckoutStep();
-  }
-}
-const pinInput=document.getElementById('customerPin');
-pinInput?.addEventListener('input',()=>{clearTimeout(pinLookupTimer);pinLookupTimer=setTimeout(()=>lookupPinCode(false),250);});
-pinInput?.addEventListener('blur',()=>lookupPinCode(true));
-
-const locationBtn=document.getElementById('useLocationBtn');
-const locationStatus=document.getElementById('locationStatus');
-const gpsPanel=document.getElementById('gpsPanel');
-let gpsSuggestion={pin:'',city:'',state:'',locality:'',district:'',nearbyAreas:[],accuracy:null,lat:null,lon:null,source:'',pinConfidence:'unknown'};
-function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus.hidden=!msg;locationStatus.className='pinStatus '+type;locationStatus.textContent=msg;}
-function setGpsPanel(html,type=''){if(!gpsPanel)return;gpsPanel.hidden=!html;gpsPanel.className='gpsPanel'+(type?' '+type:'');gpsPanel.innerHTML=html;}
-function renderNearbyPinButtons(pins){
-  const rows=(Array.isArray(pins)?pins:[]).filter(x=>/^\d{6}$/.test(String(x?.pin||'')));
-  if(!rows.length)return '';
-  return '<span class="gpsMeta"><strong>Choose a nearby delivery PIN</strong> — tap the PIN that belongs to your area:</span><span class="gpsPins">'+rows.map(x=>{
-    const pin=String(x.pin), area=(Array.isArray(x.areas)?x.areas:[]).slice(0,2).join(' · ');
-    const label=x.distanceHint==='GPS point'?'GPS area':'Nearby area';
-    return '<button type="button" class="gpsPinBtn" data-gps-pin="'+pin+'">'+escDetail(pin)+'<small>'+escDetail(area||label)+'</small></button>';
-  }).join('')+'</span><span class="gpsPinNote">Selecting a PIN is an explicit choice: it will fill City/State from the PIN service. Your street/house address is never filled automatically.</span>';
-}
-async function selectGpsPin(pin){
-  const value=String(pin||'').replace(/\D/g,'').slice(0,6); if(value.length!==6)return;
-  const pinEl=document.getElementById('customerPin'); if(!pinEl)return;
-  pinEl.value=value;
-  gpsSuggestion.pin=value;
-  gpsPanel?.querySelectorAll('[data-gps-pin]').forEach(b=>b.classList.toggle('selected',b.getAttribute('data-gps-pin')===value));
-  setPinStatus('Loading City and State for selected PIN '+value+'…','loading');
-  await lookupPinCode(true);
-  const lookupOk=currentField('customerPin')===value && pinLookup.pin===value && Boolean(pinLookup.state);
-  if(gpsPanel){gpsPanel.hidden=true;gpsPanel.setAttribute('aria-expanded','false');}
-  if(lookupOk)setLocationStatus('✓ PIN '+value+' selected. City and State were filled from the PIN service.','ok');
-  else setLocationStatus('⚠ PIN '+value+' selected, but City/State could not be detected. Please verify the PIN.','error');
-  refreshCheckoutStep();
-}
-gpsPanel?.addEventListener('click',e=>{const b=e.target.closest('[data-gps-pin]');if(b)selectGpsPin(b.getAttribute('data-gps-pin'));});
-function currentField(id){return String(document.getElementById(id)?.value||'').trim();}
-function rememberGpsSuggestion(d,accuracy,pos){
-  gpsSuggestion={pin:String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6),city:String(d.city||'').trim(),state:String(d.state||d.principalSubdivision||'').trim(),locality:String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim(),district:String(d.district||'').trim(),nearbyAreas:Array.isArray(d.nearbyAreas)?d.nearbyAreas:[],accuracy:Number.isFinite(accuracy)?accuracy:null,lat:Number(pos?.coords?.latitude),lon:Number(pos?.coords?.longitude),source:String(d.source||''),pinConfidence:String(d.pinConfidence||'unknown')};
-}
-async function useCurrentLocation(){
-  if(!navigator.geolocation){setLocationStatus('Location is not supported on this device. Please enter the address manually.','error');return;}
-  if(!window.isSecureContext){setLocationStatus('Location needs a secure connection (HTTPS). Please open the live HTTPS site and try again.','error');return;}
-  locationBtn.disabled=true;setGpsPanel('Getting a fresh GPS fix…','');setLocationStatus('Getting your current location…','loading');
-  const reverseWithServer=async(pos)=>{
-    const qs='?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude);
-    const r=await fetch('/api/reverse-geocode'+qs,{cache:'no-store',headers:{'Accept':'application/json'}});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||'Server location lookup failed');
-    return d;
-  };
-  const normalizeText=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-  const findStateOption=stateEl=>{
-    const wanted=normalizeText(stateEl);
-    const el=document.getElementById('customerState');
-    return [...(el?.options||[])].find(o=>normalizeText(o.value)===wanted||normalizeText(o.textContent)===wanted||(/^delhi$/.test(wanted)&&normalizeText(o.value)==='delhi'));
-  };
-  const applyLocation=async(d,accuracy,pos)=>{
-    const pin=String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6);
-    const detectedLocality=String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim();
-    let detectedCity=String(d.city||'').trim()||detectedLocality;
-    const detectedState=String(d.state||d.principalSubdivision||'').trim();
-    if(/^delhi$/i.test(detectedState)||/^(?:new\s+delhi|(?:north|south|east|west|central|north\s*east|north\s*west|south\s*east|south\s*west)\s+delhi)$/i.test(detectedCity))detectedCity='Delhi';
-    if(!detectedCity&&/delhi/i.test(String(d.district||'')))detectedCity='Delhi';
-    if(!detectedState)throw new Error('GPS found your position, but the State could not be identified. Please select your State manually.');
-    rememberGpsSuggestion({...d,city:detectedCity,state:detectedState,pin},accuracy,pos);
-
-    const pinEl=document.getElementById('customerPin');
-    const cityEl=document.getElementById('customerCity');
-    const stateEl=document.getElementById('customerState');
-    const existingPin=currentField('customerPin');
-    const existingCity=currentField('customerCity');
-    const existingState=currentField('customerState');
-    const gpsAccuracy=Number.isFinite(accuracy)?Math.round(accuracy):null;
-
-    // GPS is a suggestion layer only. Never overwrite anything the customer has
-    // already entered or selected, especially PIN/address/city/state.
-    let pinAction='';
-    if(existingPin){
-      pinAction=pin && existingPin!==pin ? 'Your entered PIN <strong>'+escDetail(existingPin)+'</strong> is kept; GPS suggested <strong>'+escDetail(pin)+'</strong>.' : 'Your entered PIN <strong>'+escDetail(existingPin)+'</strong> is kept.';
-    }else{
-      pinAction=pin?'GPS suggests PIN <strong>'+escDetail(pin)+'</strong>; it will NOT be entered automatically. Enter your delivery PIN manually.':'GPS could not determine a postal PIN; enter your delivery PIN manually.';
-    }
-
-    if(!existingCity){
-      if(detectedCity){
-        if(cityEl){
-          let opt=[...cityEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedCity)||normalizeText(o.textContent)===normalizeText(detectedCity));
-          if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}
-          cityEl.disabled=false;cityEl.value=detectedCity;
-        }
-      }
-    }
-    if(!existingState){
-      const opt=findStateOption(detectedState);
-      if(opt)stateEl.value=opt.value;
-    }
-
-    // Address is deliberately never filled from reverse geocoding. A GPS point
-    // cannot prove a house/flat/door number and locality labels can be wrong.
-    const addressHint=currentField('customerAddress')?'Your address was kept exactly as entered.':'Enter your house / flat / street address manually.';
-    const localityText=detectedLocality||detectedCity||'area not returned';
-    const nearby=(Array.isArray(d.nearbyAreas)?d.nearbyAreas:[]).map(x=>String(x?.name||x||'').trim()).filter(Boolean);
-    const typedAddress=currentField('customerAddress');
-    const addressAreaMatch=typedAddress.match(/\b(mukundpur|jahangirpuri|jhangirpuri|bhalaswa|bhalswa|samaypur|badli|burari|azadpur|model town|shalimar bagh|adarpur|nangli poona|pooth kalan|pooth khurd)\b/i);
-    const customerArea=addressAreaMatch?addressAreaMatch[1]:'';
-    const areaNames=[customerArea,localityText,...nearby].filter((v,i,a)=>v&&a.findIndex(x=>x.toLowerCase()===v.toLowerCase())===i).slice(0,10);
-    const areaTags=areaNames.length?'<span class="gpsMeta"><strong>Area names found:</strong></span><span class="gpsAreas">'+areaNames.map((v,i)=>'<span class="gpsAreaTag '+((customerArea&&v.toLowerCase()===customerArea.toLowerCase())?'primary':'')+'">'+escDetail(v)+(customerArea&&v.toLowerCase()===customerArea.toLowerCase()?' · your entry':'')+'</span>').join('')+'</span>':'';
-    const areaHint=customerArea?'Your entered area <strong>'+escDetail(customerArea)+'</strong> is kept as the customer-provided area.':'GPS area names are suggestions only; enter your actual area in the address field.';
-    const conflict=existingPin&&pin&&existingPin!==pin;
-    const accuracyText=gpsAccuracy!==null?gpsAccuracy+' m':'accuracy unavailable';
-    const sourceText=d.source?(' · '+escDetail(d.source)):'';
-    let nearbyPinHtml='';
-    try{
-      const nr=await fetch('/api/nearby-pincodes?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude),{cache:'no-store',headers:{'Accept':'application/json'}});
-      const nd=await nr.json().catch(()=>({}));
-      if(nr.ok)nearbyPinHtml=renderNearbyPinButtons(nd.pins||[]);
-    }catch(_){ }
-    const accuracyType=gpsAccuracy!==null&&gpsAccuracy<=50?'ok':(gpsAccuracy!==null&&gpsAccuracy<=150?'warn':'error');
-    const panelType=conflict?'warn':accuracyType;
-    setGpsPanel('<strong>GPS location found</strong><br>Area suggestion: '+escDetail(localityText)+' · '+escDetail(detectedCity||'—')+' · '+escDetail(detectedState||'—')+'<span class="gpsMeta">Accuracy: '+accuracyText+sourceText+'</span>'+areaTags+nearbyPinHtml+'<span class="gpsHint">'+areaHint+'</span><span class="gpsMeta">'+pinAction+'</span><span class="gpsMeta">'+addressHint+'</span>',panelType);
-    if(conflict){
-      setPinStatus('⚠ GPS PIN '+pin+' differs from your entered PIN '+existingPin+'. Your entered PIN is kept — please verify it.','error');
-      setLocationStatus('⚠ GPS found a location, but the PINs do not match. Please verify your delivery PIN.','error');
-    }else if(existingPin){
-      setPinStatus('✓ GPS found a location suggestion. Your entered PIN was not changed. Please verify the address and PIN.','ok');
-      setLocationStatus(gpsAccuracy!==null&&gpsAccuracy>50?'⚠ Location is approximate. Your existing address and PIN were kept unchanged.':'✓ Location found. Your existing address and PIN were kept unchanged.',gpsAccuracy!==null&&gpsAccuracy>50?'error':'ok');
-    }else{
-      setPinStatus('✓ GPS found an area suggestion. Your delivery PIN was not filled automatically; enter your own delivery PIN.','ok');
-      setLocationStatus(gpsAccuracy!==null&&gpsAccuracy>50?'⚠ GPS is approximate. Enter your actual delivery address and PIN manually.':'✓ Location found. Enter your actual delivery address and PIN before ordering.',gpsAccuracy!==null&&gpsAccuracy>50?'error':'ok');
-    }
-    refreshCheckoutStep();
-  };
-  try{
-    const getBestPosition=()=>new Promise((resolve,reject)=>{
-      let best=null,bestAccuracy=Infinity,finished=false,watchId=null,timer=null;
-      const finish=(err)=>{if(finished)return;finished=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(timer)clearTimeout(timer);if(best)resolve(best);else reject(err||new Error('No location fix was received.'));};
-      const onSuccess=pos=>{const a=Number(pos?.coords?.accuracy||Infinity);if(Number.isFinite(a)&&a<bestAccuracy){best=pos;bestAccuracy=a;setLocationStatus('GPS fix improving… current accuracy about '+Math.round(a)+' m.','loading');if(a<=40)finish();}};
-      const onError=err=>{if(err?.code===1)finish(err);};
-      watchId=navigator.geolocation.watchPosition(onSuccess,onError,{enableHighAccuracy:true,maximumAge:0,timeout:12000});
-      timer=setTimeout(()=>finish(best?null:new Error('Your phone could not get a fresh GPS fix. Turn on Location/GPS and try again near a window or outside.')),40000);
-    });
-    const pos=await getBestPosition();
-    const accuracy=Number(pos?.coords?.accuracy||Infinity);
-    if(!Number.isFinite(accuracy))throw new Error('Your phone did not report location accuracy. Turn on Precise location for Chrome and try again.');
-    if(accuracy>1500)throw new Error('Your phone is returning only an approximate location (about '+Math.round(accuracy)+' m). Turn ON Precise location for Chrome and try again.');
-    setLocationStatus('GPS fix received ('+Math.round(accuracy)+' m). Checking the postal address…','loading');
-    const d=await reverseWithServer(pos);
-    await applyLocation(d,accuracy,pos);
-  }catch(err){
-    console.error('GPS location failed:',err);
-    let msg='Could not detect your location. Please try again or enter the address manually.';
-    if(err&&err.code===1)msg='Location permission was denied. Allow location access for this site, then try again.';
-    else if(err&&err.code===2)msg='Your phone could not get a location fix. Turn on Location/GPS and try again.';
-    else if(err&&err.code===3)msg='Location took too long to respond. Turn on Location/GPS and try again near a window or outside.';
-    else if(err&&err.message)msg=err.message;
-    setGpsPanel('<strong>GPS could not be completed</strong><br>'+escDetail(msg)+'<span class="gpsMeta">Your manually entered address, PIN, city and state remain unchanged.</span>','error');
-    setLocationStatus(msg,'error');
-  }finally{locationBtn.disabled=false;}
-}
-locationBtn?.addEventListener('click',useCurrentLocation);
 async function initCheckout(){
   try{
     const [sr,pr]=await Promise.all([fetch('/api/site-config',{cache:'no-store'}),fetch('/api/products',{cache:'no-store'})]);
@@ -381,7 +179,7 @@ async function initCheckout(){
   subtotal=cart.reduce((sum,p)=>sum+priceOf(p)*Number(p.qty||1),0);
   shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
   total=subtotal+shipping;
-  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
+  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
   document.getElementById('sumSubtotal').textContent=money(subtotal);
   document.getElementById('sumShipping').textContent=shipping===0?(subtotal>=checkoutSettings.freeShipping?'FREE':'—'):money(shipping);
   document.getElementById('sumTotal').textContent=money(total);
@@ -396,7 +194,7 @@ function setCheckoutStep(activeStep,doneUpto){
  });
 }
 function refreshCheckoutStep(){
- const addrFields=['customerName','customerEmail','customerPhone','customerAddress','customerCity','customerState','customerPin'];
+ const addrFields=['customerName','customerEmail','customerPhone','customerAddress','customerCity','customerPin'];
  const addressDone=addrFields.every(id=>(document.getElementById(id)?.value||'').trim().length>0);
  const paymentDone=Boolean(document.querySelector('input[name="pay"]:checked'));
  if(!addressDone)setCheckoutStep(2,1);
@@ -405,14 +203,6 @@ function refreshCheckoutStep(){
 }
 document.getElementById('checkoutForm')?.addEventListener('input',refreshCheckoutStep);
 document.getElementById('checkoutForm')?.addEventListener('change',refreshCheckoutStep);
-['customerAddress','customerPin','customerCity','customerState'].forEach(id=>{
- const el=document.getElementById(id); el?.addEventListener('input',()=>{
-   if(id==='customerPin' && currentField('customerPin') && gpsSuggestion.pin && currentField('customerPin')===gpsSuggestion.pin){
-     setGpsPanel(gpsPanel?.innerHTML||'', 'ok');
-   }
-   refreshCheckoutStep();
- });
-});
 refreshCheckoutStep();
 function renderDiscountRow(){const row=document.getElementById('sumDiscountRow');if(!row)return;if(discount>0){row.style.display='';document.getElementById('sumDiscountLabel').textContent='Discount'+(appliedCoupon?' ('+appliedCoupon+')':'');document.getElementById('sumDiscount').textContent='-'+money(discount);}else{row.style.display='none';}}
 async function applyCoupon(){const code=document.getElementById('couponCode').value.trim();if(!code)return;try{const r=await fetch('/api/coupons/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,subtotal})});const d=await r.json();if(!r.ok)throw Error(d.error);discount=Number(d.discount||0);appliedCoupon=d.code;total=subtotal-discount+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total);document.getElementById('couponMsg').textContent='Coupon applied: '+money(discount)+' off';}catch(e){document.getElementById('couponMsg').textContent=e.message;discount=0;appliedCoupon='';total=subtotal+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total)}}
@@ -427,24 +217,17 @@ function showUPIPopup(){
 async function placeOrder(e){
  e.preventDefault(); if(!cart.length)return;
  const form=e.currentTarget; if(!form.reportValidity())return;
- const currentPin=String(document.getElementById('customerPin')?.value||'').trim();
- if(currentPin.length===6 && pinLookup.pin!==currentPin){await lookupPinCode(true);}
- if(currentPin.length!==6 || pinLookup.pin!==currentPin || !pinLookup.state || !pinLookup.cities.length){alert('Please enter a valid 6-digit PIN so City and State can be detected.');return;}
- const selectedCity=String(document.getElementById('customerCity')?.value||'').trim();
- const selectedState=String(document.getElementById('customerState')?.value||'').trim();
- if(!selectedCity||!selectedState){alert('Please select the detected City and State.');return;}
- const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), state=document.getElementById('customerState').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
+ const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=(window.buildAddress?window.buildAddress():document.getElementById('customerAddress').value).trim(), state=document.getElementById('customerState').value, phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
  const payment=document.querySelector('input[name="pay"]:checked')?.value||'cod';
  const customerToken=localStorage.getItem('yourTypeCustomerToken')||'';
- const idem=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('yt-'+Date.now()+'-'+Math.random().toString(36).slice(2));
- const purchase={name,city,state,pin,address,phone,email,idempotencyKey:idem,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
+ const purchase={name,city,state,pin,address,phone,email,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
  const btn=form.querySelector('button[type="submit"]'); if(btn)btn.disabled=true;
- try{const headers={'Content-Type':'application/json','X-Idempotency-Key':idem}; if(customerToken)headers.Authorization='Bearer '+customerToken;
+ try{const headers={'Content-Type':'application/json'}; if(customerToken)headers.Authorization='Bearer '+customerToken;
   const r=await fetch('/api/orders',{method:'POST',headers,body:JSON.stringify(purchase)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not place order');
   const finalTotal=Number.isFinite(Number(d.total))?Number(d.total):total;
-  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal; purchase.taxableSubtotal=Number(d.taxableSubtotal||0); purchase.gst=Number(d.gst||0); purchase.gstRate=Number(d.gstRate||0); purchase.cgst=Number(d.cgst||0); purchase.sgst=Number(d.sgst||0); purchase.igst=Number(d.igst||0); purchase.taxSplitConfigured=d.taxSplitConfigured!==false; purchase.taxSplitStatus=d.taxSplitStatus||'';
+  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal;
   localStorage.setItem('yourTypeLastPurchase',JSON.stringify(purchase));localStorage.setItem('yourTypeLastOrder',JSON.stringify(purchase));localStorage.removeItem('yourTypeCart');
-  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);const gstEl=document.getElementById('sumGst');const gstRow=document.getElementById('sumGstRow');if(gstEl&&gstRow){gstEl.textContent=money(Number(d.gst||0));gstRow.style.display=Number(d.gst||0)>0?'':'none';}document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
+  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
  }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
 }
 
@@ -454,208 +237,71 @@ function closeOrderModal(){
  m.setAttribute('aria-hidden','true');
  document.body.style.overflow='';
 }
-function moneyDetail(n){return money(Number(n||0));}
-function escDetail(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function imageDetail(v){return imageUrl(v);}
-function restoreOrderConfirmation(){
- const p=document.getElementById('orderDetailsPanel');
- if(p){p.hidden=true;p.innerHTML='';}
- document.getElementById('orderCompleteTitle').innerHTML='Order<br>confirmed.';
- document.querySelector('#orderModal .orderLead').innerHTML='Your order is confirmed.<br>Your Type is on its way to you.';
- document.querySelector('#orderModal .orderMeta').style.display='grid';
- document.querySelector('#orderModal .orderActions').style.display='flex';
- document.querySelector('#orderModal .orderFine').style.display='block';
-}
-async function viewOrderDetails(){
- const panel=document.getElementById('orderDetailsPanel');
- if(!panel)return;
- panel.hidden=false;
- panel.innerHTML='<div class="detailLoading">Loading your order details…</div>';
- document.querySelector('#orderModal .orderMeta').style.display='none';
- document.querySelector('#orderModal .orderActions').style.display='none';
- document.querySelector('#orderModal .orderFine').style.display='none';
- document.getElementById('orderCompleteTitle').textContent='Order details.';
- document.querySelector('#orderModal .orderLead').textContent='Here is the complete summary of your order.';
- let o=null;
- try{
-   const cached=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null');
-   const id=cached?.orderId||document.getElementById('doneOrderId')?.textContent||'';
-   if(id){
-     const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});
-     if(r.ok)o=await r.json();
-   }
-   if(!o)o=cached;
- }catch(_){
-   try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(__){}
- }
- if(!o){panel.innerHTML='<div class="detailLoading">Order details are temporarily unavailable. Please use Track Order with your order ID.</div><div class="detailActions"><button class="detailBack" type="button" onclick="restoreOrderConfirmation()">← BACK</button><button class="detailTrack" type="button" onclick="window.location.href=\'track-order.html\'">TRACK ORDER</button></div>';return;}
- const items=Array.isArray(o.items)?o.items:[];
- const subtotal=Number(o.subtotal||0);
- const discount=Number(o.discount||0);
- const shipping=Number(o.shipping||0);
- const gst=Number(o.gst||0);
- const taxable=Number(o.taxableSubtotal||0);
- const total=Number(o.total||0);
- const status=o.status||'Confirmed';
- const payment=String(o.payment||'COD').toUpperCase();
- const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
- const address=[o.name||o.customer||'',o.address||'',o.city||'',o.state||'',o.pin||'',o.phone?'Phone: '+o.phone:''].filter(Boolean).join('\n');
- const itemHtml=items.length?items.map(it=>{
-   const qty=Math.max(1,Number(it.qty||1));
-   const price=Number(it.price||0);
-   return '<div class="detailItem"><img src="'+escDetail(imageDetail(it.image))+'" alt="" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><div><b>'+escDetail(it.name||'Product')+'</b><small>SKU: '+escDetail(it.sku||'—')+' · Size: '+escDetail(it.size||'—')+' · Color: '+escDetail(it.color||'—')+' · Qty: '+qty+(it.hsn?' · HSN: '+escDetail(it.hsn):'')+(Number(it.gstRate)>0?' · GST: '+escDetail(it.gstRate)+'%':'')+'</small></div><strong>'+moneyDetail(price*qty)+'</strong></div>';
- }).join(''):'<div class="detailLoading">No item details available.</div>';
- const taxLine=gst>0?'<div class="gstValue"><span>GST included'+(Number(o.gstRate)>0?' @ '+escDetail(o.gstRate)+'%':'')+'</span><b>'+moneyDetail(gst)+'</b></div>':'';
- const split=(o.taxSplitConfigured===false?'':(Number(o.igst||0)>0?'<div><span>IGST</span><b>'+moneyDetail(o.igst)+'</b></div>':(Number(o.cgst||0)>0||Number(o.sgst||0)>0?'<div><span>CGST + SGST</span><b>'+moneyDetail(Number(o.cgst||0)+Number(o.sgst||0))+'</b></div>':'')));
- panel.innerHTML='<div class="detailTop"><div><h3>'+escDetail(o.orderId||o.id||'Order')+'</h3><small style="color:#666;font-size:9px">'+escDetail(date)+'</small></div><span class="detailStatus">'+escDetail(status)+'</span></div>'
- +'<div class="detailGrid"><div class="detailBox"><span>Payment</span><b>'+escDetail(payment)+'</b></div><div class="detailBox"><span>Total paid / payable</span><b>'+moneyDetail(total)+'</b></div></div>'
- +'<div class="detailItems">'+itemHtml+'</div>'
- +'<div class="detailTotals"><div><span>Subtotal</span><b>'+moneyDetail(subtotal)+'</b></div>'
- +(discount>0?'<div><span>Discount</span><b class="discountValue">−'+moneyDetail(discount)+'</b></div>':'')
- +'<div><span>Shipping</span><b>'+(shipping>0?moneyDetail(shipping):'FREE')+'</b></div>'
- +(taxable>0?'<div><span>Taxable value</span><b>'+moneyDetail(taxable)+'</b></div>':'')
- +taxLine+split+'<div class="grand"><span>ORDER TOTAL</span><b>'+moneyDetail(total)+'</b></div></div>'
- +'<div class="detailAddress"><h4>SHIPPING ADDRESS</h4><div>'+escDetail(address)+'</div></div>'
- +'<div class="detailActions"><button class="detailBack" type="button" onclick="restoreOrderConfirmation()">← BACK</button><button class="detailInvoice" type="button" onclick="downloadCustomerInvoice()">DOWNLOAD INVOICE ↓</button><button class="detailTrack" type="button" onclick="window.location.href=\'track-order.html?order=\'+encodeURIComponent(o.orderId||o.id||\'\')+\'\'">TRACK ORDER →</button></div><div class="invoiceNote">Invoice uses the final server-confirmed order amount and GST breakup.</div>';
-}
-async function downloadCustomerInvoice(){
-  let o=null;
-  try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(_){ }
-  const id=o?.orderId||document.getElementById('doneOrderId')?.textContent||'';
-  if(!id){alert('Order ID not found.');return;}
-  const btn=document.querySelector('.detailInvoice');
-  const oldText=btn?.textContent;
-  if(btn){btn.disabled=true;btn.textContent='PREPARING PDF…';}
-  try{
-    try{const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});if(r.ok)o=await r.json()}catch(_){ }
-    if(!o)throw new Error('Invoice details are temporarily unavailable. Please try again.');
-
-    /* CUSTOMER PDF — self-contained, no CDN, no print dialog. */
-    const N=v=>Number(v||0);
-    const moneyPdf=v=>'Rs. '+N(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const clean=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/[₹€£]/g,'Rs.').replace(/[·•]/g,'-').trim();
-    const esc=v=>clean(v).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
-    const wrap=(value,max)=>{const words=clean(value).split(/\s+/).filter(Boolean),lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(t.length<=max)line=t;else{if(line)lines.push(line);line=w;}}if(line)lines.push(line);return lines.length?lines:['-'];};
-    const W=595,H=842,M=38,CW=W-M*2;
-    const pages=[];let cmds=[],y=804;
-    const C={black:'0.05 0.05 0.05',dark:'0.13 0.13 0.13',mid:'0.28 0.28 0.28',gray:'0.45 0.45 0.45',line:'0.86 0.86 0.86',light:'0.965 0.965 0.965',white:'1 1 1'};
-    const push=x=>cmds.push(x);
-    const text=(v,x,yy,size=9,bold=false,color=C.dark)=>push(`${color} rg BT /${bold?'F2':'F1'} ${size} Tf ${x} ${yy} Td (${esc(v)}) Tj ET`);
-    const approxWidth=(v,size)=>Math.min(240,clean(v).length*size*0.50);
-    const textRight=(v,right,yy,size=9,bold=false,color=C.dark)=>text(v,right-approxWidth(v,size),yy,size,bold,color);
-    const line=(x1,y1,x2,y2)=>push(`${C.line} RG 0.7 w ${x1} ${y1} m ${x2} ${y2} l S`);
-    const box=(x,yy,w,h,color=C.light)=>push(`${color} rg ${x} ${yy} ${w} ${h} re f`);
-    const badge=(label,x,yy,w)=>{box(x,yy,w,22,C.light);text(label,x+8,yy+8,7,true,C.mid);};
-    const footer=pageNo=>{line(M,31,W-M,31);text('YOUR TYPE  /  PREMIUM STREETWEAR',M,18,7,true,C.gray);text('Customer copy  -  Page '+pageNo,430,18,7,false,C.gray);};
-    const nextPage=()=>{if(cmds.length)pages.push(cmds.join('\n'));cmds=[];y=804;};
-    const section=title=>{if(y<115){footer(pages.length+1);nextPage();}text(title.toUpperCase(),M,y,8,true,C.gray);y-=16;};
-
-    /* Header */
-    box(0,744,W,98,C.black);
-    text('YOUR TYPE',M,808,23,true,C.white);
-    text('PREMIUM STREETWEAR',M,790,7,false,'0.72 0.72 0.72');
-    textRight('ORDER INVOICE',W-M,808,12,true,C.white);
-    textRight('CUSTOMER COPY',W-M,790,7,false,'0.70 0.70 0.70');
-
-    y=716;
-    text('ORDER ID',M,y,7,true,C.gray);text(id,M,y-16,11,true,C.dark);
-    text('ORDER DATE',M+205,y,7,true,C.gray);
-    text(o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'-',M+205,y-16,9,false,C.dark);
-    text('PAYMENT',W-M-145,y,7,true,C.gray);
-    text(String(o.payment||'COD').toUpperCase(),W-M-145,y-16,9,true,C.dark);
-    y-=50;
-
-    const status=String(o.status||'Confirmed').toUpperCase();
-    badge('STATUS  '+status,M,y-22,145);
-    if(o.courier)badge('COURIER  '+clean(o.courier),M+155,y-22,150);
-    if(o.awb)badge('AWB  '+clean(o.awb),M+315,y-22,140);
-    y-=44;
-
-    section('Order items');
-    box(M,y-23,CW,23,C.black);
-    text('PRODUCT DETAILS',M+10,y-15,7,true,C.white);
-    textRight('QTY',W-M-105,y-15,7,true,C.white);
-    textRight('AMOUNT',W-M-10,y-15,7,true,C.white);
-    y-=39;
-    const items=Array.isArray(o.items)?o.items:[];
-    if(!items.length){text('No item details available.',M+10,y-12,9,false,C.gray);y-=35;}
-    for(const it of items){
-      const qty=Math.max(1,N(it.qty)||1),total=N(it.price)*qty;
-      const details=[it.name||'Product','SKU '+(it.sku||'-'),'Size '+(it.size||'-'),'Color '+(it.color||'-'),it.hsn?'HSN '+it.hsn:'',N(it.gstRate)>0?'GST '+it.gstRate+'%':''].filter(Boolean).join('  /  ');
-      const lines=wrap(details,68);const rowH=Math.max(34,lines.length*11+13);
-      if(y-rowH<175){footer(pages.length+1);nextPage();section('Order items - continued');}
-      lines.forEach((ln,i)=>text(ln,M+10,y-10-i*11,i===0?9:7,i===0,i===0?C.dark:C.gray));
-      textRight(String(qty),W-M-105,y-15,9,false,C.dark);
-      textRight(moneyPdf(total),W-M-10,y-15,8,true,C.dark);
-      line(M,y-rowH,W-M,y-rowH);y-=rowH;
-    }
-    y-=18;
-
-    /* Totals card */
-    const summary=[['Subtotal',moneyPdf(o.subtotal)]];
-    if(N(o.discount)>0)summary.push(['Discount','- '+moneyPdf(o.discount)]);
-    summary.push(['Shipping',N(o.shipping)>0?moneyPdf(o.shipping):'FREE']);
-    if(o.taxableSubtotal!==undefined)summary.push(['Taxable value',moneyPdf(o.taxableSubtotal)]);
-    if(N(o.gst)>0)summary.push(['GST included'+(N(o.gstRate)>0?' @ '+o.gstRate+'%':''),moneyPdf(o.gst)]);
-    const boxH=summary.length*19+52,sx=W-M-245;
-    if(y-boxH<310){footer(pages.length+1);nextPage();}
-    box(sx,y-boxH,245,boxH,'0.97 0.97 0.97');let sy=y-17;
-    for(const row of summary){text(row[0],sx+12,sy,8,false,C.gray);textRight(row[1],W-M-12,sy,8,true,C.dark);sy-=19;}
-    line(sx+12,sy+7,W-M-12,sy+7);
-    text('TOTAL',sx+12,sy-10,10,true,C.dark);textRight(moneyPdf(o.total),W-M-12,sy-11,14,true,C.black);
-    y-=boxH+24;
-
-    section('Shipping address');
-    const city=clean(o.city),state=clean(o.state);
-    const cityState=city&&state?(city.toLowerCase()===state.toLowerCase()?city:city+', '+state):(city||state);
-    const addressLines=[o.name||o.customer,o.address,cityState,o.district?'District: '+o.district:'',o.pin?'PIN: '+o.pin:'',o.phone?'Phone: '+o.phone:''].filter(v=>clean(v));
-    const addrH=Math.max(74,addressLines.length*14+28);
-    if(y-addrH<190){footer(pages.length+1);nextPage();section('Shipping address');}
-    box(M,y-addrH,CW,addrH,'0.97 0.97 0.97');let ay=y-19;
-    addressLines.forEach((ln,i)=>{wrap(ln,82).slice(0,3).forEach(part=>{text(part,M+14,ay,9,i===0,i===0?C.dark:C.mid);ay-=13;});});
-    y-=addrH+22;
-
-    if(N(o.cgst)>0||N(o.sgst)>0||N(o.igst)>0){
-      section('GST breakup');
-      const parts=N(o.igst)>0?[['IGST',o.igst]]:[['CGST',o.cgst],['SGST',o.sgst]];
-      let x=M;for(const [lab,val] of parts){box(x,y-42,120,42,C.light);text(lab,x+10,y-17,7,true,C.gray);text(moneyPdf(val),x+10,y-34,9,true,C.dark);x+=132;}y-=60;
-    }
-
-    /* Delivery / payment note */
-    if(y<105){footer(pages.length+1);nextPage();}
-    box(M,y-58,CW,58,C.black);
-    text(String(o.payment||'cod').toLowerCase()==='cod'?'CASH ON DELIVERY':'PAYMENT RECEIVED',M+14,y-18,8,true,C.white);
-    text(String(o.payment||'COD').toUpperCase()==='COD'?'Please keep the payable amount ready at delivery.':'Your payment method is recorded on this order.',M+14,y-34,7,false,'0.76 0.76 0.76');
-    text('Order status: '+status,M+14,y-47,7,false,'0.62 0.62 0.62');
-    y-=78;
-    text('This is a computer-generated order invoice. No signature is required.',M,48,7,false,C.gray);
-    footer(pages.length+1);nextPage();
-
-    /* Build a standards-compliant PDF with Helvetica fonts only, so Android can open it without external assets. */
-    const objs=[],add=s=>{objs.push(s);return objs.length};
-    const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-    const f2=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
-    const contentIds=[];for(const stream of pages){const sid=add(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`);contentIds.push(sid);}
-    const pagesId=add('');const catalogId=add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
-    const pageIds=[];for(const sid of contentIds)pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${sid} 0 R >>`));
-    objs[pagesId-1]=`<< /Type /Pages /Kids [${pageIds.map(n=>n+' 0 R').join(' ')}] /Count ${pageIds.length} >>`;
-    let pdf='%PDF-1.4\n%',offsets=[0];
-    for(let i=0;i<objs.length;i++){offsets[i+1]=new TextEncoder().encode(pdf).length;pdf+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
-    const xref=new TextEncoder().encode(pdf).length;pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
-    for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
-    pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root '+catalogId+' 0 R >>\nstartxref\n'+xref+'\n%%EOF';
-    const blob=new Blob([new TextEncoder().encode(pdf)],{type:'application/pdf'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='YOUR_TYPE_ORDER_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf';document.body.appendChild(a);a.click();
-    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
-  }catch(err){console.error('Customer invoice PDF failed:',err);alert('Invoice could not be downloaded. Please try again.');}
-  finally{if(btn){btn.disabled=false;btn.textContent=oldText||'DOWNLOAD INVOICE ↓';}}
-}
-
-
 function continueShopping(){
  window.ytNavigate('index.html');
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOrderModal();});
+</script>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const STATES=['Andaman and Nicobar Islands','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chandigarh','Chhattisgarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Goa','Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka','Kerala','Ladakh','Lakshadweep','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Puducherry','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal'];
+ const stSel=$('customerState');STATES.forEach(x=>{const o=document.createElement('option');o.value=o.textContent=x;stSel.appendChild(o)});
+ const sum=$('adSum'),grid=$('adGrid');
+ const pin=$('customerPin'),city=$('customerCity'),st=$('adStatus'),near=$('adNear'),areaW=$('adAreaWrap'),area=$('customerArea');
+ let seq=0,lastPin='';
+ const say=(t,c)=>{st.textContent=t||'';st.className='adStatus'+(c?' '+c:'')};
+ const matchState=n=>{n=String(n||'').toLowerCase().replace(/&/g,'and');return STATES.find(x=>x.toLowerCase()===n)||STATES.find(x=>n&&(x.toLowerCase().includes(n)||n.includes(x.toLowerCase())))||''};
+ const getJSON=async(u,ms)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||8000);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('bad');return await r.json()}finally{clearTimeout(t)}};
+ async function lookup(p,keepNear){
+  const my=++seq;lastPin=p;pin.classList.remove('ok','bad');areaW.hidden=true;say('Checking PIN…');
+  try{
+   const d=await getJSON('https://api.postalpincode.in/pincode/'+p);if(my!==seq)return;
+   const r=d&&d[0];
+   if(!r||r.Status!=='Success'||!(r.PostOffice||[]).length){pin.classList.add('bad');sum.hidden=true;grid.hidden=false;say('This PIN was not found. Please check it, or fill state and city yourself.','err');return}
+   const offices=r.PostOffice,f=offices[0],state=matchState(f.State);
+   if(state)stSel.value=state;city.value=f.District||f.Block||city.value;
+   area.innerHTML='';offices.forEach(o=>{const e=document.createElement('option');e.value=e.textContent=o.Name;area.appendChild(e)});
+   const oth=document.createElement('option');oth.value='';oth.textContent='Other / not listed';area.appendChild(oth);
+   areaW.hidden=false;pin.classList.add('ok');say('');
+   const nm=f.Name||f.Block||f.District||'';$('adSumMain').textContent=p+' · '+(f.District||nm)+', '+(f.State||'');$('adSumSub').textContent='Delivery area confirmed. Choose your locality below, then add your house address.';
+   sum.hidden=false;if(state)grid.hidden=true;else{grid.hidden=false;say('Please choose your state and city.','err')}
+   if(!keepNear)near.hidden=true;
+   document.querySelectorAll('.adChip').forEach(c=>c.classList.toggle('on',c.dataset.pin===p));
+  }catch(e){if(my!==seq)return;sum.hidden=true;grid.hidden=false;say('Could not check the PIN right now. Please fill State and City yourself.','err')}
+ }
+ pin.addEventListener('input',()=>{pin.value=pin.value.replace(/\D/g,'').slice(0,6);pin.classList.remove('ok','bad');if(pin.value.length===6&&pin.value!==lastPin)lookup(pin.value);else if(pin.value.length<6){areaW.hidden=true;sum.hidden=true;grid.hidden=false;lastPin='';say('')}});
+ function chips(list){
+  near.innerHTML='<p>Nearby PIN codes — tap yours</p><div class="adChips"></div>';const w=near.querySelector('.adChips');
+  list.forEach(x=>{const b=document.createElement('button');b.type='button';b.className='adChip';b.dataset.pin=x.pin;b.innerHTML='<b>'+x.pin+'</b><small>'+String(x.name).replace(/</g,'&lt;')+'</small>';b.onclick=()=>{pin.value=x.pin;lookup(x.pin,true).then(()=>{const h=$('customerHouse');if(h&&pin.classList.contains('ok')){h.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>h.focus({preventScroll:true}),350)}})};w.appendChild(b)});
+  near.hidden=false;
+ }
+ $('adLocBtn').addEventListener('click',()=>{
+  const btn=$('adLocBtn');
+  if(!navigator.geolocation){say('Location is not available on this device. Enter your PIN instead.','err');return}
+  btn.disabled=true;say('Finding your location…');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+   try{
+    const la=pos.coords.latitude,lo=pos.coords.longitude;
+    const g=await getJSON('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+la+'&longitude='+lo+'&localityLanguage=en',9000);
+    const junk=/asia|subcontinent|mainland|railway|region|territory|kolkata|india$|zone|division|circle|^north |^south |^east |^west /i;
+    const names=[];[g.locality,g.city,...((g.localityInfo&&g.localityInfo.administrative)||[]).filter(a=>a.adminLevel>=5).map(a=>a.name)].forEach(n=>{n=String(n||'').trim();if(n&&!junk.test(n)&&!names.includes(n))names.push(n)});
+    const found=new Map();
+    if(/^\d{6}$/.test(g.postcode||''))found.set(g.postcode,(g.locality||g.city||'Near you'));
+    await Promise.all(names.slice(0,4).map(async n=>{try{const d=await getJSON('https://api.postalpincode.in/postoffice/'+encodeURIComponent(n),7000);const r=d&&d[0];if(r&&r.Status==='Success')r.PostOffice.forEach(o=>{if(o.Pincode&&!found.has(o.Pincode))found.set(o.Pincode,o.Name+' · '+o.District)})}catch(_){}}));
+    const list=[...found].map(([p,n])=>({pin:p,name:n})).slice(0,6);
+    if(!list.length)say('Could not find PINs near you. Please type your PIN above.','err');
+    else{say('Tap the PIN that matches your area.');chips(list)}
+   }catch(e){say('Could not read your location. Please type your PIN.','err')}
+   btn.disabled=false;
+  },err=>{btn.disabled=false;say(err&&err.code===1?'Location permission is off. Please type your PIN instead.':'Could not get your location. Please type your PIN.','err')},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+ });
+ $('adEdit').addEventListener('click',()=>{grid.hidden=false;sum.hidden=true;stSel.focus()});
+ window.buildAddress=function(){
+  const h=$('customerHouse').value.trim(),l=$('customerLandmark').value.trim(),a=(area&&!areaW.hidden)?area.value:'';
+  const full=[h,l?'Landmark: '+l:'',a].filter(Boolean).join(', ');$('customerAddress').value=full;return full;
+ };
+})();
 </script>
 <script src="/music-player.js" defer></script>
 </body></html>

@@ -240,7 +240,10 @@ async function selectGpsPin(pin){
   gpsPanel?.querySelectorAll('[data-gps-pin]').forEach(b=>b.classList.toggle('selected',b.getAttribute('data-gps-pin')===value));
   setPinStatus('Loading City and State for selected PIN '+value+'…','loading');
   await lookupPinCode(true);
-  if(currentField('customerPin')===value)setLocationStatus('✓ PIN '+value+' selected. City and State were filled from the PIN service.','ok');
+  const lookupOk=currentField('customerPin')===value && pinLookup.pin===value && Boolean(pinLookup.state);
+  if(gpsPanel){gpsPanel.hidden=true;gpsPanel.setAttribute('aria-expanded','false');}
+  if(lookupOk)setLocationStatus('✓ PIN '+value+' selected. City and State were filled from the PIN service.','ok');
+  else setLocationStatus('⚠ PIN '+value+' selected, but City/State could not be detected. Please verify the PIN.','error');
   refreshCheckoutStep();
 }
 gpsPanel?.addEventListener('click',e=>{const b=e.target.closest('[data-gps-pin]');if(b)selectGpsPin(b.getAttribute('data-gps-pin'));});

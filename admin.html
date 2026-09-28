@@ -1655,7 +1655,25 @@ async function restoreServerBackup(){
     return [a,[o.city,pin].filter(Boolean).join(' - '),st?st+', India':'India'].filter(Boolean)}
   async function qrOf(text){if(!(await lib('qr',()=>window.QRCode)))return'';try{const h=document.createElement('div');h.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(h);new QRCode(h,{text:String(text),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});await new Promise(r=>setTimeout(r,120));const c=h.querySelector('canvas'),u=c?c.toDataURL('image/png'):'';h.remove();return u}catch(_){return''}}
   async function barOf(text,h){if(!(await lib('bar',()=>window.JsBarcode)))return'';try{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(s,String(text),{format:'CODE128',displayValue:false,height:h,margin:0,width:1.6});s.setAttribute('preserveAspectRatio','none');return s.outerHTML}catch(_){return''}}
-  function figures(o,items){const sub=num(o.subtotal)||items.reduce((s,i)=>s+i.price*i.qty,0),disc=num(o.discount),ship=num(o.shipping),rate=num(o.gstRate)||num(state.settings?.gst)||5,total=num(o.total)||Math.max(0,sub-disc)+ship,gst=num(o.gst)||Math.round(Math.max(0,sub-disc)*rate/(100+rate));return{sub,disc,ship,rate,total,gst}}
+  function figures(o,items){
+    // Always recalculate PDF totals from the current order data. Never trust
+    // stale total/GST fields left by an older invoice implementation.
+    const itemSubtotal=items.reduce((s,i)=>s+(num(i.price)*Math.max(1,num(i.qty))),0);
+    const storedSubtotal=num(o.subtotal);
+    const sub=storedSubtotal>0?storedSubtotal:itemSubtotal;
+    const disc=Math.min(Math.max(0,num(o.discount)),sub);
+    const ship=Math.max(0,num(o.shipping));
+    const rate=Math.max(0,num(o.gstRate)||num(state.settings?.gst)||5);
+    const extraFields=['charges','extraCharges','otherCharges','handlingFee','codFee','platformFee','gatewayCharge','gatewayFee'];
+    const charges=Math.max(0,extraFields.reduce((sum,k)=>sum+num(o[k]),0));
+    const taxable=Math.max(0,sub-disc);
+    // Product prices in this store are GST-inclusive by default. If a future
+    // order explicitly says GST is not included, add GST to the customer total.
+    const gstInclusive=o.gstInclusive!==false&&o.gstIncluded!==false;
+    const gst=gstInclusive?Math.round(taxable*rate/(100+rate)*100)/100:Math.round(taxable*rate/100*100)/100;
+    const total=Math.round((taxable+ship+charges+(gstInclusive?0:gst))*100)/100;
+    return{sub,disc,ship,charges,rate,total,gst,gstInclusive,taxable}
+  }
 
   /* ---------- CSS ---------- */
   const CSS=`.ys{width:794px;background:#f7f7f6;color:#0d0f10;font:11px/1.4 Archivo,'Noto Sans Devanagari',Arial,sans-serif;display:flex;flex-direction:column}
@@ -1729,7 +1747,7 @@ async function restoreServerBackup(){
 <div class="addr"><div><span class="lbl">${t('ship')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><span class="lbl">${t('bill')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><div class="script">${t('ty1')}<br>${t('ty2')}</div><div class="small" style="margin-top:10px">— YOUR TYPE —</div></div></div>
 <table><thead><tr><th class="c">${t('sno')}</th><th>${t('prod')}</th><th class="c">${t('sku')}</th><th class="c">${t('size')}</th><th class="c">${t('qty')}</th><th class="r">${t('unit')}</th><th class="r">${t('total')}</th></tr></thead><tbody>${rows}</tbody></table>${extra}
 <div class="mid">${S.badges?`<div class="badges"><div><span>✔</span>${t('q1')}</div><div><span>🚚</span>${t('q2')}</div><div><span>♻</span>${t('q3')}</div><div><span>☎</span>${t('q4')}</div></div>`:'<div></div>'}
-<div class="box${hidePrice?' hp':''}"><div class="row"><span>${t('sub')}</span><b>${inr(F.sub)}</b></div><div class="row"><span>${t('shp')}</span><b>${F.ship?inr(F.ship):t('free')}</b></div>${F.disc?`<div class="row disc"><span>${t('disc')}${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(F.disc)}</b></div>`:''}<div class="row"><span>${t('gst')} ${F.rate}%)</span><b>${inr(F.gst)}</b></div><div class="grand"><span>${t('total').toUpperCase()}</span><span>${inr(F.total)}</span></div><div class="small">(${t('incl')} ${F.gst} @ ${F.rate}%)</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">${t('collect')}</span><b>${inr(F.total)}</b></div>`:`<div class="cod"><b>${t('prepaid')}</b></div>`):''}</div></div>${promo}
+<div class="box${hidePrice?' hp':''}"><div class="row"><span>${t('sub')}</span><b>${inr(F.sub)}</b></div>${F.disc?`<div class="row disc"><span>${t('disc')}${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(F.disc)}</b></div>`:''}<div class="row"><span>${t('shp')}</span><b>${F.ship?inr(F.ship):t('free')}</b></div>${F.charges?`<div class="row"><span>OTHER CHARGES</span><b>${inr(F.charges)}</b></div>`:''}<div class="row"><span>${t('gst')} ${F.rate}%)</span><b>${inr(F.gst)}</b></div><div class="grand"><span>${t('total').toUpperCase()}</span><span>${inr(F.total)}</span></div><div class="small">(${F.gstInclusive?'Includes':'Adds'} GST of ${inr(F.gst)} @ ${F.rate}%${F.gstInclusive?' in the total':''})</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">${t('collect')}</span><b>${inr(F.total)}</b></div>`:`<div class="cod"><b>${t('prepaid')}</b></div>`):''}</div></div>${promo}
 <div class="box info"><div><div class="trk">${qrImg?`<div class="qr"><img src="${qrImg}"></div>`:''}<div><span class="lbl">${t('track')}</span><div class="small">${t('visit')}<br><b style="color:#000">${E(S.trackUrl.replace(/^https?:\/\//,'').split('?')[0])}</b></div></div></div></div><div><span class="lbl">${t('shipto')}</span><b style="display:block">${name}</b>${E(addrLines(o).join(', '))}<br>${E(o.phone||'')}</div><div>${retImg?`<div class="trk"><div class="qr"><img src="${retImg}"></div><div><span class="lbl">${t('ret')}</span><div class="small">${t('retd')}</div></div></div>`:`<div class="script">Built for<br>Real Ones</div>`}</div></div>
 <div class="notes"><b>${t('sold')}:</b> ${E(S.name)}${foot?' &nbsp;|&nbsp; '+foot:''}<br>${E(S.policy)}${(S.email||S.phone)?' ${t("help")}: '.replace('${t("help")}',t('help'))+E([S.email,S.phone].filter(Boolean).join(' | ')):''}${!inv?`<br><br>${t('packed')}: ____________ &nbsp;&nbsp; ${t('checked')}: ____________ &nbsp;&nbsp; ${t('date')}: ____________`:''}<br>${t('comp')}</div></div>
 <div class="ft"><div><div class="logo">YOUR TYPE™</div><div class="sub">PREMIUM STREETWEAR</div></div><div>THANK YOU &nbsp;/&nbsp; STAY STYLISH</div><div class="w">${social}</div></div></div>`;

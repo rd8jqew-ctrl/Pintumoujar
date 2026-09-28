@@ -154,6 +154,17 @@ async function api(req,res,p){
   }
 
   if(req.method==='GET'&&p==='/api/products')return send(res,200,{products:db.products.filter(p=>p.active!==false).map(safeProduct)},'application/json',origin);
+  if(req.method==='GET'&&p==='/api/reverse-geocode'){
+   try{
+     const lat=Number(new URL(req.url,'http://localhost').searchParams.get('lat'));
+     const lon=Number(new URL(req.url,'http://localhost').searchParams.get('lon'));
+     if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return send(res,400,{error:'Invalid location coordinates'},'application/json',origin);
+     const rr=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon),{headers:{'User-Agent':'YOUR-TYPE/1.0 (delivery address lookup)'},signal:AbortSignal.timeout(8000)});
+     if(!rr.ok)throw new Error('Reverse geocoding failed');
+     const d=await rr.json(); const a=d.address||{};
+     return send(res,200,{displayName:String(d.display_name||''),pin:String(a.postcode||''),state:String(a.state||''),city:String(a.city||a.town||a.village||a.municipality||a.district||''),address:[a.house_number,a.road,a.neighbourhood||a.suburb].filter(Boolean).join(', ')},'application/json',origin);
+   }catch(e){return send(res,503,{error:'Location address lookup is temporarily unavailable. Please enter the address manually.'},'application/json',origin)}
+  }
   if(req.method==='GET'&&p.startsWith('/api/reviews/')){const name=decodeURIComponent(p.slice('/api/reviews/'.length));return send(res,200,{reviews:db.reviews.filter(r=>r.product===name&&r.status!=='rejected').slice(-50).reverse()},'application/json',origin)}
   if(req.method==='POST'&&p==='/api/reviews'){const x=await body(req),name=String(x.product||'').trim(),title=String(x.title||'').trim(),text=String(x.text||'').trim(),rating=Math.max(1,Math.min(5,Math.floor(Number(x.rating||5))));const s=auth(req,'customer');if(!name||!title||!text||text.length>800)return send(res,400,{error:'Product, title and review text are required'},'application/json',origin);if(!s)return send(res,401,{error:'Please sign in to review'},'application/json',origin);const verified=db.orders.some(o=>o.userId===s.userId&&o.status!=='Cancelled'&&o.items?.some(it=>it.name===name));const u=db.users.find(v=>v.id===s.userId);const r={id:crypto.randomUUID(),product:name,rating,title,text,name:u?.name||'Customer',verified,status:'pending',reply:'',createdAt:new Date().toISOString()};db.reviews.push(r);audit('review.create',{id:r.id});await saveAndFlush(db);return send(res,201,{ok:true,review:r},'application/json',origin)}
 

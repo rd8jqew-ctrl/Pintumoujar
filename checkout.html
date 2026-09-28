@@ -6,7 +6,7 @@
 <title>Checkout — YOUR TYPE</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
-<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}</style>
+<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}</style>
 </head>
 <body>
 <div class="shipping"><div class="shipping-track"><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span></div></div>
@@ -33,7 +33,8 @@
       <input id="customerName" required placeholder="Full name" autocomplete="name">
       <input id="customerEmail" required type="email" placeholder="Email address" autocomplete="email">
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
-      <h3>Shipping / Billing Address</h3>
+      <div class="addressHead"><h3>Shipping / Billing Address</h3><button type="button" class="locationBtn" id="useLocationBtn">⌖ USE CURRENT LOCATION</button></div>
+      <div id="locationStatus" class="pinStatus" aria-live="polite" hidden></div>
       <label class="fieldLabel" for="customerAddress">Address</label>
       <input id="customerAddress" required placeholder="House / Flat, Street, Area" autocomplete="street-address">
       <div><label class="fieldLabel" for="customerPin">PIN code</label><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="postal-code" aria-describedby="pinStatus"></div>
@@ -215,6 +216,33 @@ async function lookupPinCode(force=false){
 const pinInput=document.getElementById('customerPin');
 pinInput?.addEventListener('input',()=>{clearTimeout(pinLookupTimer);pinLookupTimer=setTimeout(()=>lookupPinCode(false),250);});
 pinInput?.addEventListener('blur',()=>lookupPinCode(true));
+
+const locationBtn=document.getElementById('useLocationBtn');
+const locationStatus=document.getElementById('locationStatus');
+function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus.hidden=!msg;locationStatus.className='pinStatus '+type;locationStatus.textContent=msg;}
+async function useCurrentLocation(){
+  if(!navigator.geolocation){setLocationStatus('Location is not supported on this device. Please enter the address manually.','error');return;}
+  locationBtn.disabled=true;setLocationStatus('Detecting your location…','loading');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const r=await fetch('/api/reverse-geocode?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude),{cache:'no-store'});
+      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error||'Could not detect the address');
+      const pin=String(d.pin||'').replace(/\D/g,'').slice(0,6);
+      if(pin.length!==6)throw new Error('PIN could not be detected. Please enter it manually.');
+      const addr=document.getElementById('customerAddress'); if(addr&&d.address)addr.value=String(d.address);
+      const pinEl=document.getElementById('customerPin'); if(pinEl)pinEl.value=pin;
+      await lookupPinCode(true);
+      const cityEl=document.getElementById('customerCity'); const detectedCity=String(d.city||'').trim();
+      if(cityEl&&detectedCity){const opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());if(opt)cityEl.value=opt.value;}
+      const stateEl=document.getElementById('customerState'); const detectedState=String(d.state||'').trim();
+      if(stateEl&&detectedState){const opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(opt)stateEl.value=opt.value;}
+      setLocationStatus('✓ Location detected. Please check your address and house / flat number before ordering.','ok');
+      refreshCheckoutStep();
+    }catch(err){setLocationStatus(err.message||'Could not detect your address. Please enter it manually.','error');}
+    finally{locationBtn.disabled=false;}
+  },err=>{const msg=err.code===1?'Location permission was denied. You can enter the address manually.':'Could not detect your location. Please try again or enter the address manually.';setLocationStatus(msg,'error');locationBtn.disabled=false;},{enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+}
+locationBtn?.addEventListener('click',useCurrentLocation);
 
 async function initCheckout(){
   try{

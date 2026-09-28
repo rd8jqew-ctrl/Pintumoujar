@@ -162,7 +162,15 @@ async function api(req,res,p){
      const rr=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon),{headers:{'User-Agent':'YOUR-TYPE/1.0 (delivery address lookup)'},signal:AbortSignal.timeout(8000)});
      if(!rr.ok)throw new Error('Reverse geocoding failed');
      const d=await rr.json(); const a=d.address||{};
-     return send(res,200,{displayName:String(d.display_name||''),pin:String(a.postcode||''),state:String(a.state||''),city:String(a.city||a.town||a.village||a.municipality||a.district||''),address:[a.house_number,a.road,a.neighbourhood||a.suburb].filter(Boolean).join(', ')},'application/json',origin);
+     // Keep the delivery locality separate from Delhi's administrative district.
+     // Nominatim may return values such as "North East Delhi" in district;
+     // that must never become the customer's City/Town field.
+     const locality=String(a.neighbourhood||a.suburb||a.quarter||a.village||a.town||a.city||'').trim();
+     let city=String(a.city||a.town||a.village||a.municipality||'').trim();
+     const state=String(a.state||'').trim();
+     if(/^delhi$/i.test(state)||/delhi/i.test(state)) city='Delhi';
+     if(!city&&/delhi/i.test(String(a.state_district||'')))city='Delhi';
+     return send(res,200,{displayName:String(d.display_name||''),pin:String(a.postcode||''),state,city,locality,address:[a.house_number,a.road].filter(Boolean).join(', '),district:String(a.state_district||a.county||'').trim()},'application/json',origin);
    }catch(e){return send(res,503,{error:'Location address lookup is temporarily unavailable. Please enter the address manually.'},'application/json',origin)}
   }
   if(req.method==='GET'&&p.startsWith('/api/reviews/')){const name=decodeURIComponent(p.slice('/api/reviews/'.length));return send(res,200,{reviews:db.reviews.filter(r=>r.product===name&&r.status!=='rejected').slice(-50).reverse()},'application/json',origin)}

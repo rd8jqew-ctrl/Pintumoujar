@@ -222,39 +222,62 @@ const locationStatus=document.getElementById('locationStatus');
 function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus.hidden=!msg;locationStatus.className='pinStatus '+type;locationStatus.textContent=msg;}
 async function useCurrentLocation(){
   if(!navigator.geolocation){setLocationStatus('Location is not supported on this device. Please enter the address manually.','error');return;}
+  if(!window.isSecureContext){setLocationStatus('Location needs a secure connection (HTTPS). Please open the live HTTPS site and try again.','error');return;}
   locationBtn.disabled=true;setLocationStatus('Detecting your location…','loading');
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    try{
-      // GPS coordinates are reverse-geocoded directly in the browser. This avoids
-      // the old server-side district/address result that could label a locality
-      // with the wrong Delhi administrative district.
-      const url='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(pos.coords.latitude)+'&longitude='+encodeURIComponent(pos.coords.longitude)+'&localityLanguage=en';
-      const r=await fetch(url,{cache:'no-store'});
-      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.description||'Could not detect the address');
-      const pin=String(d.postcode||'').replace(/\D/g,'').slice(0,6);
-      const detectedLocality=String(d.locality||'').trim();
-      let detectedCity=String(d.city||'').trim()||detectedLocality;
-      const detectedState=String(d.principalSubdivision||'').trim();
-      if(/^(?:new\s+delhi|delhi(?:\s+(?:north|south|east|west|central|northeast|northwest|southeast|southwest))?)$/i.test(detectedCity))detectedCity='Delhi';
-      if(pin.length!==6||!detectedState)throw new Error('A complete location could not be detected. Please enter the address manually.');
-      const addr=document.getElementById('customerAddress');
-      // GPS supplies locality only. Customer still confirms the exact house/flat/room.
-      if(addr&&detectedLocality){const existing=String(addr.value||'').trim();const same=new RegExp('(?:^|[, ]+)'+detectedLocality.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:$|[, ])','i').test(existing);if(!existing)addr.value=detectedLocality;else if(!same)addr.value=existing+', '+detectedLocality;}
-      const pinEl=document.getElementById('customerPin'); if(pinEl)pinEl.value=pin;
-      const cityEl=document.getElementById('customerCity');
-      if(cityEl&&detectedCity){
-        const opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());
-        if(opt)cityEl.value=opt.value; else {cityEl.innerHTML='<option value="'+escDetail(detectedCity)+'">'+escDetail(detectedCity)+'</option>';cityEl.disabled=false;cityEl.value=detectedCity;}
-      }
-      const stateEl=document.getElementById('customerState');
-      if(stateEl&&detectedState){const opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(opt)stateEl.value=opt.value;}
-      pinLookup={pin,state:detectedState,cities:[detectedCity]};
-      setPinStatus('✓ GPS location: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState,'ok');
-      setLocationStatus('✓ Location detected. Add your house / flat / room number before ordering.','ok');
-      refreshCheckoutStep();
-    }catch(err){setLocationStatus(err.message||'Could not detect your address. Please enter it manually.','error');}
-    finally{locationBtn.disabled=false;}
-  },err=>{const msg=err.code===1?'Location permission was denied. You can enter the address manually.':'Could not detect your location. Please try again or enter the address manually.';setLocationStatus(msg,'error');locationBtn.disabled=false;},{enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+  const reverseWithServer=async(pos)=>{
+    const qs='?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude);
+    const r=await fetch('/api/reverse-geocode'+qs,{cache:'no-store',headers:{'Accept':'application/json'}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Server location lookup failed');
+    return d;
+  };
+  const reverseWithBDC=async(pos)=>{
+    const url='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(pos.coords.latitude)+'&longitude='+encodeURIComponent(pos.coords.longitude)+'&localityLanguage=en';
+    const r=await fetch(url,{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.description||'Backup location lookup failed');
+    return d;
+  };
+  const applyLocation=(d)=>{
+    const pin=String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6);
+    const detectedLocality=String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim();
+    let detectedCity=String(d.city||'').trim()||detectedLocality;
+    const detectedState=String(d.state||d.principalSubdivision||'').trim();
+    // Delhi district names are administrative areas, not the City/Town value.
+    if(/^delhi$/i.test(detectedState)||/^(?:new\s+delhi|(?:north|south|east|west|central|north\s*east|north\s*west|south\s*east|south\s*west)\s+delhi)$/i.test(detectedCity))detectedCity='Delhi';
+    if(!detectedCity&&/delhi/i.test(String(d.district||'')))detectedCity='Delhi';
+    if(pin.length!==6||!detectedState||!detectedCity)throw new Error('GPS found your position, but the address service did not return a complete PIN/City/State. Please try once more.');
+    const addr=document.getElementById('customerAddress');
+    // Do not overwrite the user's existing house/street details.
+    if(addr&&detectedLocality){
+      const existing=String(addr.value||'').trim();
+      const re=new RegExp('(?:^|[, ]+)'+detectedLocality.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')+'(?:$|[, ])','i');
+      if(!existing)addr.value=detectedLocality; else if(!re.test(existing))addr.value=existing+', '+detectedLocality;
+    }
+    const pinEl=document.getElementById('customerPin');if(pinEl)pinEl.value=pin;
+    const cityEl=document.getElementById('customerCity');
+    if(cityEl){let opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}cityEl.disabled=false;cityEl.value=detectedCity;}
+    const stateEl=document.getElementById('customerState');
+    if(stateEl){let opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(!opt&&/^delhi$/i.test(detectedState)){opt=[...stateEl.options].find(o=>/^delhi$/i.test(o.value));}if(opt)stateEl.value=opt.value;}
+    pinLookup={pin,state:detectedState,cities:[detectedCity]};
+    setPinStatus('✓ GPS: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState+' · '+pin,'ok');
+    setLocationStatus('✓ Location detected. Add your house / flat / room number before ordering.','ok');
+    refreshCheckoutStep();
+  };
+  try{
+    const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:20000,maximumAge:0}));
+    let d;
+    try{d=await reverseWithServer(pos);}catch(serverErr){console.warn('Server reverse geocode failed:',serverErr);d=await reverseWithBDC(pos);}
+    applyLocation(d);
+  }catch(err){
+    console.error('GPS location failed:',err);
+    let msg='Could not detect your location. Please try again or enter the address manually.';
+    if(err&&err.code===1)msg='Location permission was denied. Please allow location access for this site, then try again.';
+    else if(err&&err.code===2)msg='Your phone could not get a GPS fix. Turn on Location/GPS and try again.';
+    else if(err&&err.code===3)msg='GPS took too long to respond. Move near a window/open area and try again.';
+    else if(err&&err.message)msg=err.message;
+    setLocationStatus(msg,'error');
+  }finally{locationBtn.disabled=false;}
 }
 locationBtn?.addEventListener('click',useCurrentLocation);
 

@@ -158,6 +158,71 @@ async function api(req,res,p){
   }
 
   if(req.method==='GET'&&p==='/api/products')return send(res,200,{products:db.products.filter(p=>p.active!==false).map(safeProduct)},'application/json',origin);
+  if(req.method==='GET'&&p==='/api/nearby-pincodes'){
+   try{
+     const u=new URL(req.url,'http://localhost');
+     const lat=Number(u.searchParams.get('lat')),lon=Number(u.searchParams.get('lon'));
+     if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return send(res,400,{error:'Invalid location coordinates'},'application/json',origin);
+     // A small, short-lived in-memory cache prevents repeated GPS clicks from
+     // hammering the public geocoder. The suggestions are approximate only.
+     const cacheKey=Math.round(lat*1000)+'|'+Math.round(lon*1000);
+     global.__ytNearbyPins ||= new Map();
+     const cached=global.__ytNearbyPins.get(cacheKey);
+     if(cached&&Date.now()-cached.time<10*60*1000)return send(res,200,cached.data,'application/json',origin);
+
+     // Check the GPS point and four nearby points (~2 km away). This is used only
+     // to discover nearby postal PINs; it never decides the customer's address.
+     const dLat=0.018, dLon=0.022;
+     const points=[[lat,lon],[lat+dLat,lon],[lat-dLat,lon],[lat,lon+dLon],[lat,lon-dLon]];
+     const cleanPin=v=>String(v||'').replace(/\D/g,'').slice(0,6);
+     const found=new Map();
+     for(let i=0;i<points.length;i++){
+       if(i>0)await new Promise(r=>setTimeout(r,1050));
+       const [la,lo]=points[i];
+       const url='https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat='+encodeURIComponent(la)+'&lon='+encodeURIComponent(lo);
+       try{
+         const rr=await fetch(url,{headers:{'User-Agent':'YOUR-TYPE/1.0 (nearby postal PIN suggestion)'},signal:AbortSignal.timeout(7000)});
+         if(!rr.ok)continue;
+         const d=await rr.json(); const a=d?.address||{}; const pin=cleanPin(a.postcode);
+         if(pin.length!==6)continue;
+         const names=[a.neighbourhood,a.suburb,a.quarter,a.village,a.town,a.city_district,a.city,a.state_district,a.county].map(v=>String(v||'').trim()).filter(Boolean);
+         const key=names.map(v=>v.toLowerCase()).join('|');
+         const prev=found.get(pin)||{pin,areas:[],city:'',state:'',distanceHint:i===0?'Your GPS point':'Nearby'};
+         for(const n of names){if(!prev.areas.some(x=>x.toLowerCase()===n.toLowerCase())&&prev.areas.length<6)prev.areas.push(n)}
+         prev.city=String(a.city||a.town||a.village||a.municipality||prev.city||'').trim();
+         prev.state=String(a.state||prev.state||'').trim();
+         if(i===0)prev.distanceHint='GPS point';
+         found.set(pin,prev);
+       }catch(_){ }
+     }
+     const pins=[...found.values()].slice(0,8);
+     // Enrich each PIN with India Post's authoritative city/state/post-office
+     // information so selecting a chip can fill the checkout details safely.
+     const enriched=[];
+     for(const item of pins){
+       try{
+         const rr=await fetch('https://api.postalpincode.in/pincode/'+encodeURIComponent(item.pin),{headers:{'User-Agent':'YOUR-TYPE/1.0'},signal:AbortSignal.timeout(6000)});
+         if(!rr.ok)continue;
+         const data=await rr.json(); const first=Array.isArray(data)&&data[0]?data[0]:null;
+         if(!first||first.Status!=='Success'||!Array.isArray(first.PostOffice)||!first.PostOffice.length)continue;
+         const rows=first.PostOffice; const state=String(rows[0]?.State||item.state||'').trim();
+         const districts=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
+         const blocks=[...new Set(rows.map(r=>String(r?.Block||'').trim()).filter(Boolean))];
+         const cityOptions=/^delhi$/i.test(state)?['Delhi']:(districts.length?districts:blocks);
+         const offices=[...new Set(rows.map(r=>String(r?.Name||'').trim()).filter(Boolean))].slice(0,5);
+         const areas=[...new Set([...item.areas,...offices].filter(Boolean))].slice(0,6);
+         enriched.push({pin:item.pin,state,cities:cityOptions,areas,distanceHint:item.distanceHint});
+       }catch(_){ }
+     }
+     // Keep the GPS-point PIN first, then nearby PINs. Never invent a PIN.
+     enriched.sort((a,b)=>(a.distanceHint==='GPS point'?0:1)-(b.distanceHint==='GPS point'?0:1));
+     const data={pins:enriched.slice(0,8),radiusKm:2};
+     global.__ytNearbyPins.set(cacheKey,{time:Date.now(),data});
+     if(global.__ytNearbyPins.size>100){const firstKey=global.__ytNearbyPins.keys().next().value;global.__ytNearbyPins.delete(firstKey)}
+     return send(res,200,data,'application/json',origin);
+   }catch(e){return send(res,503,{error:'Nearby PIN suggestions are temporarily unavailable.'},'application/json',origin)}
+  }
+
   if(req.method==='GET'&&p==='/api/reverse-geocode'){
    try{
      const lat=Number(new URL(req.url,'http://localhost').searchParams.get('lat'));

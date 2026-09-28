@@ -6,7 +6,7 @@
 <title>Checkout — YOUR TYPE</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
-<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}.gpsPanel{border:1px solid #242424;padding:10px 12px;margin:8px 0 12px;font-size:10px;line-height:1.6;color:#aaa}.gpsPanel strong{color:#eee}.gpsPanel.ok{border-color:#315c3a}.gpsPanel.warn{border-color:#6a5528}.gpsPanel.error{border-color:#5e3030}.gpsMeta{display:block;color:#777;font-size:9px;margin-top:3px}.gpsUseBtn{margin-top:7px;border:1px solid #444;background:#111;color:#ddd;padding:6px 8px;font:inherit;font-size:9px;cursor:pointer}.gpsUseBtn:hover{border-color:#777;color:#fff}.gpsAreas{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.gpsAreaTag{border:1px solid #292929;background:#0d0d0d;color:#aaa;padding:4px 7px;font-size:8px;letter-spacing:.2px}.gpsAreaTag.primary{border-color:#3c6b46;color:#d9f7df}.gpsHint{display:block;color:#777;font-size:9px;margin-top:5px}</style>
+<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}.gpsPanel{border:1px solid #242424;padding:10px 12px;margin:8px 0 12px;font-size:10px;line-height:1.6;color:#aaa}.gpsPanel strong{color:#eee}.gpsPanel.ok{border-color:#315c3a}.gpsPanel.warn{border-color:#6a5528}.gpsPanel.error{border-color:#5e3030}.gpsMeta{display:block;color:#777;font-size:9px;margin-top:3px}.gpsUseBtn{margin-top:7px;border:1px solid #444;background:#111;color:#ddd;padding:6px 8px;font:inherit;font-size:9px;cursor:pointer}.gpsUseBtn:hover{border-color:#777;color:#fff}.gpsAreas{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.gpsAreaTag{border:1px solid #292929;background:#0d0d0d;color:#aaa;padding:4px 7px;font-size:8px;letter-spacing:.2px}.gpsAreaTag.primary{border-color:#3c6b46;color:#d9f7df}.gpsPins{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.gpsPinBtn{border:1px solid #3a3a3a;background:#111;color:#eee;padding:7px 9px;border-radius:2px;font:inherit;font-size:9px;line-height:1.2;cursor:pointer;text-align:left}.gpsPinBtn:hover{border-color:#888;background:#171717}.gpsPinBtn.selected{border-color:#3c6b46;color:#d9f7df}.gpsPinBtn small{display:block;color:#777;font-size:7px;margin-top:2px}.gpsPinNote{display:block;color:#777;font-size:8px;margin-top:5px}.gpsHint{display:block;color:#777;font-size:9px;margin-top:5px}</style>
 </head>
 <body>
 <div class="shipping"><div class="shipping-track"><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span></div></div>
@@ -223,6 +223,27 @@ const gpsPanel=document.getElementById('gpsPanel');
 let gpsSuggestion={pin:'',city:'',state:'',locality:'',district:'',nearbyAreas:[],accuracy:null,lat:null,lon:null,source:'',pinConfidence:'unknown'};
 function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus.hidden=!msg;locationStatus.className='pinStatus '+type;locationStatus.textContent=msg;}
 function setGpsPanel(html,type=''){if(!gpsPanel)return;gpsPanel.hidden=!html;gpsPanel.className='gpsPanel'+(type?' '+type:'');gpsPanel.innerHTML=html;}
+function renderNearbyPinButtons(pins){
+  const rows=(Array.isArray(pins)?pins:[]).filter(x=>/^\d{6}$/.test(String(x?.pin||'')));
+  if(!rows.length)return '';
+  return '<span class="gpsMeta"><strong>Choose a nearby delivery PIN</strong> — tap the PIN that belongs to your area:</span><span class="gpsPins">'+rows.map(x=>{
+    const pin=String(x.pin), area=(Array.isArray(x.areas)?x.areas:[]).slice(0,2).join(' · ');
+    const label=x.distanceHint==='GPS point'?'GPS area':'Nearby area';
+    return '<button type="button" class="gpsPinBtn" data-gps-pin="'+pin+'">'+escDetail(pin)+'<small>'+escDetail(area||label)+'</small></button>';
+  }).join('')+'</span><span class="gpsPinNote">Selecting a PIN is an explicit choice: it will fill City/State from the PIN service. Your street/house address is never filled automatically.</span>';
+}
+async function selectGpsPin(pin){
+  const value=String(pin||'').replace(/\D/g,'').slice(0,6); if(value.length!==6)return;
+  const pinEl=document.getElementById('customerPin'); if(!pinEl)return;
+  pinEl.value=value;
+  gpsSuggestion.pin=value;
+  gpsPanel?.querySelectorAll('[data-gps-pin]').forEach(b=>b.classList.toggle('selected',b.getAttribute('data-gps-pin')===value));
+  setPinStatus('Loading City and State for selected PIN '+value+'…','loading');
+  await lookupPinCode(true);
+  if(currentField('customerPin')===value)setLocationStatus('✓ PIN '+value+' selected. City and State were filled from the PIN service.','ok');
+  refreshCheckoutStep();
+}
+gpsPanel?.addEventListener('click',e=>{const b=e.target.closest('[data-gps-pin]');if(b)selectGpsPin(b.getAttribute('data-gps-pin'));});
 function currentField(id){return String(document.getElementById(id)?.value||'').trim();}
 function rememberGpsSuggestion(d,accuracy,pos){
   gpsSuggestion={pin:String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6),city:String(d.city||'').trim(),state:String(d.state||d.principalSubdivision||'').trim(),locality:String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim(),district:String(d.district||'').trim(),nearbyAreas:Array.isArray(d.nearbyAreas)?d.nearbyAreas:[],accuracy:Number.isFinite(accuracy)?accuracy:null,lat:Number(pos?.coords?.latitude),lon:Number(pos?.coords?.longitude),source:String(d.source||''),pinConfidence:String(d.pinConfidence||'unknown')};
@@ -299,9 +320,15 @@ async function useCurrentLocation(){
     const conflict=existingPin&&pin&&existingPin!==pin;
     const accuracyText=gpsAccuracy!==null?gpsAccuracy+' m':'accuracy unavailable';
     const sourceText=d.source?(' · '+escDetail(d.source)):'';
+    let nearbyPinHtml='';
+    try{
+      const nr=await fetch('/api/nearby-pincodes?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude),{cache:'no-store',headers:{'Accept':'application/json'}});
+      const nd=await nr.json().catch(()=>({}));
+      if(nr.ok)nearbyPinHtml=renderNearbyPinButtons(nd.pins||[]);
+    }catch(_){ }
     const accuracyType=gpsAccuracy!==null&&gpsAccuracy<=50?'ok':(gpsAccuracy!==null&&gpsAccuracy<=150?'warn':'error');
     const panelType=conflict?'warn':accuracyType;
-    setGpsPanel('<strong>GPS location found</strong><br>Area suggestion: '+escDetail(localityText)+' · '+escDetail(detectedCity||'—')+' · '+escDetail(detectedState||'—')+'<span class="gpsMeta">Accuracy: '+accuracyText+sourceText+'</span>'+areaTags+'<span class="gpsHint">'+areaHint+'</span><span class="gpsMeta">'+pinAction+'</span><span class="gpsMeta">'+addressHint+'</span>',panelType);
+    setGpsPanel('<strong>GPS location found</strong><br>Area suggestion: '+escDetail(localityText)+' · '+escDetail(detectedCity||'—')+' · '+escDetail(detectedState||'—')+'<span class="gpsMeta">Accuracy: '+accuracyText+sourceText+'</span>'+areaTags+nearbyPinHtml+'<span class="gpsHint">'+areaHint+'</span><span class="gpsMeta">'+pinAction+'</span><span class="gpsMeta">'+addressHint+'</span>',panelType);
     if(conflict){
       setPinStatus('⚠ GPS PIN '+pin+' differs from your entered PIN '+existingPin+'. Your entered PIN is kept — please verify it.','error');
       setLocationStatus('⚠ GPS found a location, but the PINs do not match. Please verify your delivery PIN.','error');

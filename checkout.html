@@ -26,7 +26,7 @@
 <main class="checkoutPage">
   <div>
     <p class="eyebrow">YOUR TYPE / CHECKOUT</p>
-    <h1>Order<br>confirmed.</h1>
+    <h1>Complete<br>your order.</h1>
     <form onsubmit="placeOrder(event)" class="form" id="checkoutForm">
       <div><input id="couponCode" placeholder="Coupon code" autocomplete="off"><button type="button" onclick="applyCoupon()">APPLY COUPON</button><small id="couponMsg"></small></div>
       <input id="customerName" required placeholder="Full name" autocomplete="name">
@@ -34,7 +34,7 @@
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
       <h3>Shipping / Billing Address</h3>
       <input id="customerAddress" required placeholder="Full address" autocomplete="street-address">
-      <div class="two"><input id="customerCity" required placeholder="City" autocomplete="address-level2"><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="PIN code" autocomplete="postal-code"></div><input id="customerState" required placeholder="State (e.g. Haryana)" autocomplete="address-level1">
+      <div class="two"><input id="customerCity" required placeholder="City" autocomplete="address-level2"><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="PIN code" autocomplete="postal-code"></div>
       <h3>Payment method</h3>
       <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
@@ -49,7 +49,6 @@
       <div><span>Subtotal</span><b id="sumSubtotal">₹0</b></div>
       <div id="sumDiscountRow" style="display:none"><span id="sumDiscountLabel">Discount</span><b id="sumDiscount" style="color:#7ee787">-₹0</b></div>
       <div><span>Shipping</span><b id="sumShipping">₹0</b></div>
-      <div id="sumGstRow" style="display:none"><span>GST included</span><b id="sumGst">₹0</b></div>
       <div class="total"><span>Total</span><b id="sumTotal">₹0</b></div>
     </div>
   </aside>
@@ -61,7 +60,7 @@
     <button class="orderClose" type="button" aria-label="Close" onclick="closeOrderModal()">×</button>
     <div class="orderMark">✓</div>
     <p class="eyebrow">YOUR TYPE / ORDER COMPLETE</p>
-    <h2 id="orderCompleteTitle">Order<br>confirmed.</h2>
+    <h2 id="orderCompleteTitle">Complete<br>your order.</h2>
     <p class="orderLead">Your order is confirmed.<br>Your Type is on its way to you.</p>
     <div class="orderMeta">
       <div><span>ORDER</span><b id="doneOrderId">—</b></div>
@@ -69,9 +68,8 @@
     </div>
     <div class="orderActions">
       <button type="button" class="orderPrimary" onclick="continueShopping()">CONTINUE SHOPPING <span>→</span></button>
-      <button type="button" class="orderSecondary" onclick="viewOrderDetails()">VIEW DETAILS</button>
+      <button type="button" class="orderSecondary" onclick="closeOrderModal()">VIEW DETAILS</button>
     </div>
-    <div id="orderDetailsPanel" class="orderDetailsPanel" hidden></div>
     <p class="orderFine">THANK YOU FOR CHOOSING YOUR TYPE.</p>
   </section>
 </div>
@@ -94,38 +92,6 @@
 .orderPrimary{flex:1;border:1px solid #eee;background:#eee;color:#080808}
 .orderSecondary{border:1px solid #333;background:#0b0b0b;color:#ddd}
 .orderFine{color:#555;font-size:8px;letter-spacing:2px;margin:24px 0 0}
-
-.orderDetailsPanel{margin-top:24px;border-top:1px solid #242424;padding-top:22px;max-height:min(62vh,620px);overflow:auto;text-align:left}
-.orderDetailsPanel[hidden]{display:none}
-.detailTop{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
-.detailTop h3{margin:0;color:#f4f4f4;font-size:18px;letter-spacing:-.4px}
-.detailStatus{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid #444;padding:7px 9px;color:#ddd}
-.detailGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-.detailBox{border:1px solid #242424;padding:12px;background:#0e0e0e}
-.detailBox span{display:block;color:#666;font-size:8px;letter-spacing:1.5px;margin-bottom:5px;text-transform:uppercase}
-.detailBox b,.detailBox div{color:#ddd;font-size:11px;line-height:1.5;white-space:pre-line}
-.detailItems{border-top:1px solid #242424;border-bottom:1px solid #242424}
-.detailItem{display:grid;grid-template-columns:48px 1fr auto;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid #1b1b1b}
-.detailItem:last-child{border-bottom:0}
-.detailItem img{width:48px;height:58px;object-fit:cover;background:#151515}
-.detailItem b{font-size:11px;color:#eee}
-.detailItem small{display:block;color:#777;font-size:9px;line-height:1.5;margin-top:3px}
-.detailItem strong{font-size:11px;color:#eee;white-space:nowrap}
-.detailTotals{margin-top:16px}
-.detailTotals>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;color:#888;font-size:10px}
-.detailTotals .discountValue{color:#7ee787}
-.detailTotals .gstValue{color:#aaa}
-.detailTotals .grand{border-top:1px solid #444;margin-top:5px;padding-top:10px;color:#eee;font-size:13px}
-.detailAddress{margin-top:18px;border:1px solid #242424;padding:13px;background:#0e0e0e}
-.detailAddress h4{margin:0 0 8px;color:#777;font-size:8px;letter-spacing:1.5px}
-.detailAddress div{color:#ddd;font-size:10px;line-height:1.65;white-space:pre-line}
-.detailActions{display:flex;gap:8px;margin-top:18px}
-.detailActions button{min-height:42px;padding:0 14px;font:inherit;font-size:9px;letter-spacing:1.2px;cursor:pointer}
-.detailBack{border:1px solid #333;background:#0b0b0b;color:#ddd}
-.detailTrack{border:1px solid #eee;background:#eee;color:#080808;flex:1}
-.detailLoading{color:#777;font-size:10px;padding:14px 0}
-@media(max-width:600px){.detailGrid{grid-template-columns:1fr}.detailTop{flex-direction:column}.detailActions{flex-direction:column}.detailTrack{flex:auto}}
-
 @media(max-width:600px){
   .orderModal{padding:14px}
   .orderCard{padding:28px 22px 22px}
@@ -133,21 +99,6 @@
   .orderActions{flex-direction:column}
   .orderSecondary{min-height:44px}
 }
-
-.invoiceNote{color:#777;font-size:9px;line-height:1.5;margin-top:14px}
-.detailActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
-.detailActions button{min-height:42px;padding:0 13px;font:inherit;font-size:9px;letter-spacing:1.2px;cursor:pointer}
-.detailBack{border:1px solid #333;background:#0b0b0b;color:#aaa}
-.detailTrack{border:1px solid #eee;background:#eee;color:#080808}
-.detailInvoice{border:1px solid #555;background:#151515;color:#eee}
-.detailAddress{border-top:1px solid #242424;margin-top:16px;padding-top:16px}
-.detailAddress h4{font-size:9px;letter-spacing:1.8px;color:#666;margin:0 0 7px}
-.detailAddress div{color:#ccc;font-size:10px;line-height:1.6;white-space:pre-line}
-.detailLoading{color:#777;font-size:10px;line-height:1.6;padding:10px 0}
-.discountValue{color:#b8b8b8!important}
-.gstValue{display:flex;justify-content:space-between;gap:12px;padding:5px 0;color:#bbb;font-size:10px;border-top:1px solid #242424;margin-top:4px;padding-top:9px}
-.detailTotals .grand{border-top:1px solid #444;margin-top:8px;padding-top:11px;color:#eee;font-size:12px}
-@media(max-width:520px){.orderCard{padding:28px 20px}.detailGrid{grid-template-columns:1fr}.orderActions{flex-direction:column}.detailActions{flex-direction:column}.detailActions button{width:100%}}
 </style>
 
 <script>
@@ -158,7 +109,7 @@ let checkoutSettings={shipping:99,freeShipping:Infinity};
 const priceOf=p=>Number(String(p?.[1]??p?.price??0).replace(/[^0-9]/g,''))||0;
 const summary=document.getElementById('summary');
 if(!cart.length){summary.innerHTML='<p style="color:#777;font-size:11px;line-height:1.7">Your bag is empty. <a href="index.html">Return to shop</a>.</p>';document.querySelector('.checkout').disabled=true;}
-else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
+else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
 let subtotal=cart.reduce((s,p)=>s+priceOf(p)*Number(p.qty||1),0);
 let shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
 let discount=0,appliedCoupon=''; let total=subtotal+shipping;
@@ -171,7 +122,7 @@ async function initCheckout(){
   subtotal=cart.reduce((sum,p)=>sum+priceOf(p)*Number(p.qty||1),0);
   shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
   total=subtotal+shipping;
-  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
+  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
   document.getElementById('sumSubtotal').textContent=money(subtotal);
   document.getElementById('sumShipping').textContent=shipping===0?(subtotal>=checkoutSettings.freeShipping?'FREE':'—'):money(shipping);
   document.getElementById('sumTotal').textContent=money(total);
@@ -209,18 +160,17 @@ function showUPIPopup(){
 async function placeOrder(e){
  e.preventDefault(); if(!cart.length)return;
  const form=e.currentTarget; if(!form.reportValidity())return;
- const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), state=document.getElementById('customerState').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
+ const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
  const payment=document.querySelector('input[name="pay"]:checked')?.value||'cod';
  const customerToken=localStorage.getItem('yourTypeCustomerToken')||'';
- const idem=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('yt-'+Date.now()+'-'+Math.random().toString(36).slice(2));
- const purchase={name,city,state,pin,address,phone,email,idempotencyKey:idem,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
+ const purchase={name,city,pin,address,phone,email,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
  const btn=form.querySelector('button[type="submit"]'); if(btn)btn.disabled=true;
- try{const headers={'Content-Type':'application/json','X-Idempotency-Key':idem}; if(customerToken)headers.Authorization='Bearer '+customerToken;
+ try{const headers={'Content-Type':'application/json'}; if(customerToken)headers.Authorization='Bearer '+customerToken;
   const r=await fetch('/api/orders',{method:'POST',headers,body:JSON.stringify(purchase)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not place order');
   const finalTotal=Number.isFinite(Number(d.total))?Number(d.total):total;
-  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal; purchase.taxableSubtotal=Number(d.taxableSubtotal||0); purchase.gst=Number(d.gst||0); purchase.gstRate=Number(d.gstRate||0); purchase.cgst=Number(d.cgst||0); purchase.sgst=Number(d.sgst||0); purchase.igst=Number(d.igst||0); purchase.taxSplitConfigured=d.taxSplitConfigured!==false; purchase.taxSplitStatus=d.taxSplitStatus||'';
+  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal;
   localStorage.setItem('yourTypeLastPurchase',JSON.stringify(purchase));localStorage.setItem('yourTypeLastOrder',JSON.stringify(purchase));localStorage.removeItem('yourTypeCart');
-  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);const gstEl=document.getElementById('sumGst');const gstRow=document.getElementById('sumGstRow');if(gstEl&&gstRow){gstEl.textContent=money(Number(d.gst||0));gstRow.style.display=Number(d.gst||0)>0?'':'none';}document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
+  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
  }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
 }
 
@@ -230,100 +180,6 @@ function closeOrderModal(){
  m.setAttribute('aria-hidden','true');
  document.body.style.overflow='';
 }
-function moneyDetail(n){return money(Number(n||0));}
-function escDetail(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function imageDetail(v){return imageUrl(v);}
-function restoreOrderConfirmation(){
- const p=document.getElementById('orderDetailsPanel');
- if(p){p.hidden=true;p.innerHTML='';}
- document.getElementById('orderCompleteTitle').innerHTML='Order<br>confirmed.';
- document.querySelector('#orderModal .orderLead').innerHTML='Your order is confirmed.<br>Your Type is on its way to you.';
- document.querySelector('#orderModal .orderMeta').style.display='grid';
- document.querySelector('#orderModal .orderActions').style.display='flex';
- document.querySelector('#orderModal .orderFine').style.display='block';
-}
-async function viewOrderDetails(){
- const panel=document.getElementById('orderDetailsPanel');
- if(!panel)return;
- panel.hidden=false;
- panel.innerHTML='<div class="detailLoading">Loading your order details…</div>';
- document.querySelector('#orderModal .orderMeta').style.display='none';
- document.querySelector('#orderModal .orderActions').style.display='none';
- document.querySelector('#orderModal .orderFine').style.display='none';
- document.getElementById('orderCompleteTitle').textContent='Order details.';
- document.querySelector('#orderModal .orderLead').textContent='Here is the complete summary of your order.';
- let o=null;
- try{
-   const cached=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null');
-   const id=cached?.orderId||document.getElementById('doneOrderId')?.textContent||'';
-   if(id){
-     const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});
-     if(r.ok)o=await r.json();
-   }
-   if(!o)o=cached;
- }catch(_){
-   try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(__){}
- }
- if(!o){panel.innerHTML='<div class="detailLoading">Order details are temporarily unavailable. Please use Track Order with your order ID.</div><div class="detailActions"><button class="detailBack" type="button" onclick="restoreOrderConfirmation()">← BACK</button><button class="detailTrack" type="button" onclick="window.location.href=\'track-order.html\'">TRACK ORDER</button></div>';return;}
- const items=Array.isArray(o.items)?o.items:[];
- const subtotal=Number(o.subtotal||0);
- const discount=Number(o.discount||0);
- const shipping=Number(o.shipping||0);
- const gst=Number(o.gst||0);
- const taxable=Number(o.taxableSubtotal||0);
- const total=Number(o.total||0);
- const status=o.status||'Confirmed';
- const payment=String(o.payment||'COD').toUpperCase();
- const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
- const address=[o.name||o.customer||'',o.address||'',o.city||'',o.state||'',o.pin||'',o.phone?'Phone: '+o.phone:''].filter(Boolean).join('\n');
- const itemHtml=items.length?items.map(it=>{
-   const qty=Math.max(1,Number(it.qty||1));
-   const price=Number(it.price||0);
-   return '<div class="detailItem"><img src="'+escDetail(imageDetail(it.image))+'" alt="" onerror="this.onerror=null;this.src=\"/photos/ornament.jpg\""><div><b>'+escDetail(it.name||'Product')+'</b><small>SKU: '+escDetail(it.sku||'—')+' · Size: '+escDetail(it.size||'—')+' · Color: '+escDetail(it.color||'—')+' · Qty: '+qty+(it.hsn?' · HSN: '+escDetail(it.hsn):'')+(Number(it.gstRate)>0?' · GST: '+escDetail(it.gstRate)+'%':'')+'</small></div><strong>'+moneyDetail(price*qty)+'</strong></div>';
- }).join(''):'<div class="detailLoading">No item details available.</div>';
- const taxLine=gst>0?'<div class="gstValue"><span>GST included'+(Number(o.gstRate)>0?' @ '+escDetail(o.gstRate)+'%':'')+'</span><b>'+moneyDetail(gst)+'</b></div>':'';
- const split=(o.taxSplitConfigured===false?'<div><span>GST split</span><b>Pending seller state</b></div>':(Number(o.igst||0)>0?'<div><span>IGST</span><b>'+moneyDetail(o.igst)+'</b></div>':(Number(o.cgst||0)>0||Number(o.sgst||0)>0?'<div><span>CGST + SGST</span><b>'+moneyDetail(Number(o.cgst||0)+Number(o.sgst||0))+'</b></div>':'')));
- panel.innerHTML='<div class="detailTop"><div><h3>'+escDetail(o.orderId||o.id||'Order')+'</h3><small style="color:#666;font-size:9px">'+escDetail(date)+'</small></div><span class="detailStatus">'+escDetail(status)+'</span></div>'
- +'<div class="detailGrid"><div class="detailBox"><span>Payment</span><b>'+escDetail(payment)+'</b></div><div class="detailBox"><span>Total paid / payable</span><b>'+moneyDetail(total)+'</b></div></div>'
- +'<div class="detailItems">'+itemHtml+'</div>'
- +'<div class="detailTotals"><div><span>Subtotal</span><b>'+moneyDetail(subtotal)+'</b></div>'
- +(discount>0?'<div><span>Discount</span><b class="discountValue">−'+moneyDetail(discount)+'</b></div>':'')
- +'<div><span>Shipping</span><b>'+(shipping>0?moneyDetail(shipping):'FREE')+'</b></div>'
- +(taxable>0?'<div><span>Taxable value</span><b>'+moneyDetail(taxable)+'</b></div>':'')
- +taxLine+split+'<div class="grand"><span>ORDER TOTAL</span><b>'+moneyDetail(total)+'</b></div></div>'
- +'<div class="detailAddress"><h4>SHIPPING ADDRESS</h4><div>'+escDetail(address)+'</div></div>'
- +'<div class="detailActions"><button class="detailBack" type="button" onclick="restoreOrderConfirmation()">← BACK</button><button class="detailInvoice" type="button" onclick="downloadCustomerInvoice()">DOWNLOAD INVOICE ↓</button><button class="detailTrack" type="button" onclick="window.location.href=\'track-order.html?order=\'+encodeURIComponent(o.orderId||o.id||\'\')+\'\'">TRACK ORDER →</button></div><div class="invoiceNote">Invoice uses the final server-confirmed order amount and GST breakup.</div>';
-}
-async function downloadCustomerInvoice(){
-  let o=null;
-  try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(_){}
-  const id=o?.orderId||document.getElementById('doneOrderId')?.textContent||'';
-  if(!id){alert('Order ID not found.');return;}
-  try{
-    const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});
-    if(r.ok)o=await r.json();
-  }catch(_){}
-  if(!o){alert('Invoice details are temporarily unavailable. Please try again.');return;}
-  const load=(src,test)=>test()?Promise.resolve(true):new Promise(resolve=>{const sc=document.createElement('script');sc.src=src;sc.onload=()=>resolve(true);sc.onerror=()=>resolve(false);document.head.appendChild(sc)});
-  const ok=await load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf?.jsPDF);
-  if(!ok){
-    const w=window.open('','_blank','noopener,noreferrer');
-    if(!w){alert('Please allow pop-ups to print/download your invoice.');return;}
-    const rows=(o.items||[]).map(i=>'<tr><td>'+escDetail(i.name||'Product')+'</td><td>'+escDetail(i.size||'—')+'</td><td>'+escDetail(i.color||'—')+'</td><td>'+Number(i.qty||1)+'</td><td>'+moneyDetail(Number(i.price||0)*Number(i.qty||1))+'</td></tr>').join('');
-    w.document.write('<!doctype html><title>YOUR TYPE Invoice '+escDetail(id)+'</title><style>body{font-family:Arial;padding:30px;color:#111}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}h1{letter-spacing:2px} .r{text-align:right}</style><h1>YOUR TYPE</h1><h2>ORDER INVOICE</h2><p>Order: '+escDetail(id)+'<br>Payment: '+escDetail(String(o.payment||'COD').toUpperCase())+'<br>Status: '+escDetail(o.status||'Confirmed')+'</p><table><thead><tr><th>Product</th><th>Size</th><th>Color</th><th>Qty</th><th>Total</th></tr></thead><tbody>'+rows+'</tbody></table><p class="r">Subtotal: '+moneyDetail(o.subtotal)+'<br>Discount: '+moneyDetail(o.discount)+'<br>Shipping: '+moneyDetail(o.shipping)+'<br>Taxable: '+moneyDetail(o.taxableSubtotal)+'<br>GST: '+moneyDetail(o.gst)+'<br><b>Total: '+moneyDetail(o.total)+'</b></p><h3>Shipping Address</h3><p>'+escDetail([o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('\n'))+'</p><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>');w.document.close();return;
-  }
-  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=doc.internal.pageSize.getWidth(); let y=48;
-  doc.setFont('helvetica','bold');doc.setFontSize(20);doc.text('YOUR TYPE',40,y);doc.setFontSize(11);doc.text('ORDER INVOICE',W-40,y,{align:'right'});
-  y+=24;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(90);doc.text('Order ID: '+id,40,y);doc.text('Date: '+(o.date?new Date(o.date).toLocaleString('en-IN'):'—'),W-40,y,{align:'right'});
-  y+=24;doc.setTextColor(30);doc.setFont('helvetica','bold');doc.text('ORDER DETAILS',40,y);y+=15;doc.setFont('helvetica','normal');doc.text('Payment: '+String(o.payment||'COD').toUpperCase(),40,y);doc.text('Status: '+(o.status||'Confirmed'),W-40,y,{align:'right'});
-  y+=22;doc.setDrawColor(220);doc.line(40,y,W-40,y);y+=18;doc.setFont('helvetica','bold');doc.text('PRODUCT',40,y);doc.text('QTY',350,y);doc.text('PRICE',W-40,y,{align:'right'});y+=15;doc.setFont('helvetica','normal');
-  for(const it of (o.items||[])){if(y>735){doc.addPage();y=48;}const qty=Math.max(1,Number(it.qty||1));const line=Number(it.price||0)*qty;doc.text(String(it.name||'Product').slice(0,48),40,y);doc.text(String(qty),350,y);doc.text(moneyDetail(line),W-40,y,{align:'right'});y+=14;doc.setFontSize(8);doc.setTextColor(100);doc.text('SKU '+String(it.sku||'—')+' · Size '+String(it.size||'—')+' · Color '+String(it.color||'—')+(it.hsn?' · HSN '+String(it.hsn):''),40,y);doc.setFontSize(9);doc.setTextColor(30);y+=17;}
-  y+=6;doc.setDrawColor(220);doc.line(40,y,W-40,y);y+=18;const rows=[['Subtotal',o.subtotal],['Discount',-Number(o.discount||0)],['Shipping',Number(o.shipping||0)],['Taxable value',Number(o.taxableSubtotal||0)],['GST',Number(o.gst||0)]];doc.setFontSize(9);for(const [label,val] of rows){doc.text(label,350,y);doc.text(moneyDetail(val),W-40,y,{align:'right'});y+=15;}doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('TOTAL',350,y+3);doc.text(moneyDetail(o.total),W-40,y+3,{align:'right'});
-  y+=35;doc.setFontSize(9);doc.text('SHIPPING ADDRESS',40,y);y+=14;doc.setFont('helvetica','normal');doc.setTextColor(70);const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join(' · ');doc.text(doc.splitTextToSize(addr,W-80),40,y);
-  y+=42;doc.setTextColor(120);doc.setFontSize(8);doc.text('Generated from the server-confirmed order details. GST shown as recorded for this order.',40,y);
-  doc.save('YOUR_TYPE_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf');
-}
-
 function continueShopping(){
  window.ytNavigate('index.html');
 }

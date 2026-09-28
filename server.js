@@ -201,6 +201,7 @@ async function api(req,res,p){
    // Re-validate the customer's PIN -> State/City on the server. Never trust the
    // values selected in the browser because the browser can be modified.
    if(!customerState||!customerCity)return send(res,400,{error:'State and City are required'},'application/json',origin);
+   let detectedDistrict='';
    try{
      const rr=await fetch('https://api.postalpincode.in/pincode/'+encodeURIComponent(String(x.pin)),{headers:{'User-Agent':'YOUR-TYPE/1.0'},signal:AbortSignal.timeout(6000)});
      if(!rr.ok)throw new Error('PIN lookup failed');
@@ -241,7 +242,7 @@ async function api(req,res,p){
      // North West Delhi, etc.) for a PIN. The customer-facing city remains Delhi.
      const delhiCityAccepted=normalizedStateForCity==='delhi' && cityKey(customerCity)==='delhi';
      if(!cityMatches && !delhiCityAccepted)return send(res,400,{error:'The selected City does not match the PIN code. Please use the detected City.'},'application/json',origin);
-     const detectedDistrict=String(rows[0]?.District||'').trim();
+     detectedDistrict=String(rows[0]?.District||'').trim();
    }catch(e){return send(res,503,{error:'PIN verification is temporarily unavailable. Please try again.'},'application/json',origin)}
    const sellerState=String(db.settings.sellerState||'').trim();
    // Seller state is needed to split GST into CGST/SGST vs IGST, but it must not

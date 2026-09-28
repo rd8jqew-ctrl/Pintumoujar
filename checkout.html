@@ -6,7 +6,7 @@
 <title>Checkout — YOUR TYPE</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
-<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}</style>
+<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}.addressHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px}.addressHead h3{margin:0}.locationBtn{border:1px solid #2c2c2c;background:#0b0b0b;color:#cfcfcf;padding:8px 10px;font:inherit;font-size:8px;letter-spacing:1.2px;white-space:nowrap;cursor:pointer}.locationBtn:hover{border-color:#666;color:#fff}.locationBtn:disabled{opacity:.6;cursor:wait}.gpsPanel{border:1px solid #242424;padding:10px 12px;margin:8px 0 12px;font-size:10px;line-height:1.6;color:#aaa}.gpsPanel strong{color:#eee}.gpsPanel.ok{border-color:#315c3a}.gpsPanel.warn{border-color:#6a5528}.gpsPanel.error{border-color:#5e3030}.gpsMeta{display:block;color:#777;font-size:9px;margin-top:3px}.gpsUseBtn{margin-top:7px;border:1px solid #444;background:#111;color:#ddd;padding:6px 8px;font:inherit;font-size:9px;cursor:pointer}.gpsUseBtn:hover{border-color:#777;color:#fff}</style>
 </head>
 <body>
 <div class="shipping"><div class="shipping-track"><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span></div></div>
@@ -34,7 +34,7 @@
       <input id="customerEmail" required type="email" placeholder="Email address" autocomplete="email">
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
       <div class="addressHead"><h3>Shipping / Billing Address</h3><button type="button" class="locationBtn" id="useLocationBtn">⌖ USE CURRENT LOCATION</button></div>
-      <div id="locationStatus" class="pinStatus" aria-live="polite" hidden></div>
+      <div id="locationStatus" class="pinStatus" aria-live="polite" hidden></div><div id="gpsPanel" class="gpsPanel" hidden aria-live="polite"></div>
       <label class="fieldLabel" for="customerAddress">Address</label>
       <input id="customerAddress" required placeholder="House / Flat, Street, Area" autocomplete="street-address">
       <div><label class="fieldLabel" for="customerPin">PIN code</label><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="postal-code" aria-describedby="pinStatus"></div>
@@ -219,11 +219,18 @@ pinInput?.addEventListener('blur',()=>lookupPinCode(true));
 
 const locationBtn=document.getElementById('useLocationBtn');
 const locationStatus=document.getElementById('locationStatus');
+const gpsPanel=document.getElementById('gpsPanel');
+let gpsSuggestion={pin:'',city:'',state:'',locality:'',district:'',accuracy:null,lat:null,lon:null,source:'',pinConfidence:'unknown'};
 function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus.hidden=!msg;locationStatus.className='pinStatus '+type;locationStatus.textContent=msg;}
+function setGpsPanel(html,type=''){if(!gpsPanel)return;gpsPanel.hidden=!html;gpsPanel.className='gpsPanel'+(type?' '+type:'');gpsPanel.innerHTML=html;}
+function currentField(id){return String(document.getElementById(id)?.value||'').trim();}
+function rememberGpsSuggestion(d,accuracy,pos){
+  gpsSuggestion={pin:String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6),city:String(d.city||'').trim(),state:String(d.state||d.principalSubdivision||'').trim(),locality:String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim(),district:String(d.district||'').trim(),accuracy:Number.isFinite(accuracy)?accuracy:null,lat:Number(pos?.coords?.latitude),lon:Number(pos?.coords?.longitude),source:String(d.source||''),pinConfidence:String(d.pinConfidence||'unknown')};
+}
 async function useCurrentLocation(){
   if(!navigator.geolocation){setLocationStatus('Location is not supported on this device. Please enter the address manually.','error');return;}
   if(!window.isSecureContext){setLocationStatus('Location needs a secure connection (HTTPS). Please open the live HTTPS site and try again.','error');return;}
-  locationBtn.disabled=true;setLocationStatus('Getting a precise GPS fix…','loading');
+  locationBtn.disabled=true;setGpsPanel('Getting a fresh GPS fix…','');setLocationStatus('Getting your current location…','loading');
   const reverseWithServer=async(pos)=>{
     const qs='?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude);
     const r=await fetch('/api/reverse-geocode'+qs,{cache:'no-store',headers:{'Accept':'application/json'}});
@@ -232,60 +239,108 @@ async function useCurrentLocation(){
     return d;
   };
   const normalizeText=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-  const applyLocation=(d,accuracy)=>{
+  const findStateOption=stateEl=>{
+    const wanted=normalizeText(stateEl);
+    const el=document.getElementById('customerState');
+    return [...(el?.options||[])].find(o=>normalizeText(o.value)===wanted||normalizeText(o.textContent)===wanted||(/^delhi$/.test(wanted)&&normalizeText(o.value)==='delhi'));
+  };
+  const applyLocation=async(d,accuracy,pos)=>{
     const pin=String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6);
     const detectedLocality=String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim();
     let detectedCity=String(d.city||'').trim()||detectedLocality;
     const detectedState=String(d.state||d.principalSubdivision||'').trim();
     if(/^delhi$/i.test(detectedState)||/^(?:new\s+delhi|(?:north|south|east|west|central|north\s*east|north\s*west|south\s*east|south\s*west)\s+delhi)$/i.test(detectedCity))detectedCity='Delhi';
     if(!detectedCity&&/delhi/i.test(String(d.district||'')))detectedCity='Delhi';
-    if(pin.length!==6||!detectedState||!detectedCity)throw new Error('GPS could not return a complete postal PIN/City/State. Please enter your PIN manually.');
+    if(!detectedState)throw new Error('GPS found your position, but the State could not be identified. Please select your State manually.');
+    rememberGpsSuggestion({...d,city:detectedCity,state:detectedState,pin},accuracy,pos);
 
-    // GPS is only allowed to fill delivery fields when the phone reports a
-    // genuinely precise fix. A coarse Android/Chrome fix can jump between
-    // nearby Delhi postal areas (for example 110033 vs 110043), so never
-    // silently turn an approximate coordinate into a customer address.
-    if(Number.isFinite(accuracy)&&accuracy>50){
-      throw new Error('Your GPS fix is only accurate to about '+Math.round(accuracy)+' m. Turn ON Precise location for Chrome and try again.');
+    const pinEl=document.getElementById('customerPin');
+    const cityEl=document.getElementById('customerCity');
+    const stateEl=document.getElementById('customerState');
+    const existingPin=currentField('customerPin');
+    const existingCity=currentField('customerCity');
+    const existingState=currentField('customerState');
+    const gpsAccuracy=Number.isFinite(accuracy)?Math.round(accuracy):null;
+
+    // GPS is a suggestion layer only. Never overwrite anything the customer has
+    // already entered or selected, especially PIN/address/city/state.
+    let pinAction='';
+    if(existingPin){
+      pinAction=pin && existingPin!==pin ? 'Your entered PIN <strong>'+escDetail(existingPin)+'</strong> is kept; GPS suggested <strong>'+escDetail(pin)+'</strong>.' : 'Your entered PIN <strong>'+escDetail(existingPin)+'</strong> is kept.';
+    }else if(pin && String(d.pinConfidence||'')==='confirmed' && Number.isFinite(accuracy) && accuracy<=75){
+      // Only auto-fill a PIN when the reverse service has independent agreement.
+      pinEl.value=pin;
+      pinAction='GPS PIN <strong>'+escDetail(pin)+'</strong> was filled because the postal result had independent agreement.';
+      await lookupPinCode(true);
+    }else{
+      pinAction=pin?'GPS suggests PIN <strong>'+escDetail(pin)+'</strong>; enter/confirm your delivery PIN manually.':'GPS could not determine a reliable postal PIN; enter your delivery PIN manually.';
     }
 
-    const addr=document.getElementById('customerAddress');
-    // Do not overwrite a customer-entered house/street address. Only add the
-    // detected locality when the field is empty and the GPS fix is precise.
-    // Never write a reverse-geocoder locality into the customer's street-address field.
-    // Locality names can be wrong at postal boundaries; the customer must enter/confirm
-    // the actual house/flat/street address themselves.
-    if(addr && !String(addr.value||'').trim()) addr.value='';
+    if(!existingCity){
+      if(detectedCity){
+        if(cityEl){
+          let opt=[...cityEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedCity)||normalizeText(o.textContent)===normalizeText(detectedCity));
+          if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}
+          cityEl.disabled=false;cityEl.value=detectedCity;
+        }
+      }
+    }
+    if(!existingState){
+      const opt=findStateOption(detectedState);
+      if(opt)stateEl.value=opt.value;
+    }
 
-    const pinEl=document.getElementById('customerPin');if(pinEl && !String(pinEl.value||'').trim())pinEl.value=pin;
-    const cityEl=document.getElementById('customerCity');
-    if(cityEl){let opt=[...cityEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedCity)||normalizeText(o.textContent)===normalizeText(detectedCity));if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}cityEl.disabled=false;cityEl.value=detectedCity;}
-    const stateEl=document.getElementById('customerState');
-    if(stateEl){let opt=[...stateEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedState)||normalizeText(o.textContent)===normalizeText(detectedState));if(!opt&&/^delhi$/i.test(detectedState))opt=[...stateEl.options].find(o=>/^delhi$/i.test(o.value));if(opt)stateEl.value=opt.value;}
-    pinLookup={pin,state:detectedState,cities:[detectedCity]};
-    setPinStatus('✓ GPS suggests: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState+' · '+pin+'. Please verify before ordering.','ok');
-    setLocationStatus('✓ Location detected. Enter your house / flat / street address and verify the PIN before ordering.','ok');
+    // Address is deliberately never filled from reverse geocoding. A GPS point
+    // cannot prove a house/flat/door number and locality labels can be wrong.
+    const addressHint=currentField('customerAddress')?'Your address was kept exactly as entered.':'Enter your house / flat / street address manually.';
+    const localityText=detectedLocality||detectedCity||'area not returned';
+    const conflict=existingPin&&pin&&existingPin!==pin;
+    const accuracyText=gpsAccuracy!==null?gpsAccuracy+' m':'accuracy unavailable';
+    const sourceText=d.source?(' · '+escDetail(d.source)):'';
+    setGpsPanel('<strong>GPS location found</strong><br>Area suggestion: '+escDetail(localityText)+' · '+escDetail(detectedCity||'—')+' · '+escDetail(detectedState||'—')+'<span class="gpsMeta">Accuracy: '+accuracyText+sourceText+'</span><span class="gpsMeta">'+pinAction+'</span><span class="gpsMeta">'+addressHint+'</span>',conflict?'warn':'ok');
+    if(conflict){
+      setPinStatus('⚠ GPS PIN '+pin+' differs from your entered PIN '+existingPin+'. Your entered PIN is kept — please verify it.','error');
+      setLocationStatus('⚠ GPS found a location, but the PINs do not match. Please verify your delivery PIN.','error');
+    }else if(existingPin){
+      setPinStatus('✓ GPS found your location. Your entered PIN was not changed. Please verify the address and PIN.','ok');
+      setLocationStatus('✓ Location found. Your existing address and PIN were kept unchanged.','ok');
+    }else if(pin && String(d.pinConfidence||'')==='confirmed' && Number.isFinite(accuracy) && accuracy<=75){
+      setPinStatus('✓ GPS postal result confirmed: '+pin+'. City/State were checked from the PIN. Please verify before ordering.','ok');
+      setLocationStatus('✓ Location found. Enter your house / flat / street address and verify the PIN before ordering.','ok');
+    }else{
+      setPinStatus('✓ GPS location found. PIN needs your confirmation before ordering.','ok');
+      setLocationStatus('✓ Location found. Enter your house / flat / street address and confirm the delivery PIN.','ok');
+    }
     refreshCheckoutStep();
   };
   try{
-    const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:25000,maximumAge:0}));
+    const getBestPosition=()=>new Promise((resolve,reject)=>{
+      let best=null,bestAccuracy=Infinity,finished=false,watchId=null,timer=null;
+      const finish=(err)=>{if(finished)return;finished=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(timer)clearTimeout(timer);if(best)resolve(best);else reject(err||new Error('No location fix was received.'));};
+      const onSuccess=pos=>{const a=Number(pos?.coords?.accuracy||Infinity);if(Number.isFinite(a)&&a<bestAccuracy){best=pos;bestAccuracy=a;setLocationStatus('GPS fix improving… current accuracy about '+Math.round(a)+' m.','loading');if(a<=40)finish();}};
+      const onError=err=>{if(err?.code===1)finish(err);};
+      watchId=navigator.geolocation.watchPosition(onSuccess,onError,{enableHighAccuracy:true,maximumAge:0,timeout:12000});
+      timer=setTimeout(()=>finish(best?null:new Error('Your phone could not get a fresh GPS fix. Turn on Location/GPS and try again near a window or outside.')),40000);
+    });
+    const pos=await getBestPosition();
     const accuracy=Number(pos?.coords?.accuracy||Infinity);
-    if(!Number.isFinite(accuracy))throw new Error('Your phone did not report GPS accuracy. Turn ON Precise location for Chrome and try again.');
-    if(accuracy>50)throw new Error('Your GPS fix is only accurate to about '+Math.round(accuracy)+' m. Turn ON Precise location for Chrome and try again.');
+    if(!Number.isFinite(accuracy))throw new Error('Your phone did not report location accuracy. Turn on Precise location for Chrome and try again.');
+    if(accuracy>1500)throw new Error('Your phone is returning only an approximate location (about '+Math.round(accuracy)+' m). Turn ON Precise location for Chrome and try again.');
+    setLocationStatus('GPS fix received ('+Math.round(accuracy)+' m). Checking the postal address…','loading');
     const d=await reverseWithServer(pos);
-    applyLocation(d,accuracy);
+    await applyLocation(d,accuracy,pos);
   }catch(err){
     console.error('GPS location failed:',err);
     let msg='Could not detect your location. Please try again or enter the address manually.';
-    if(err&&err.code===1)msg='Location permission was denied. Please allow location access for this site, then try again.';
-    else if(err&&err.code===2)msg='Your phone could not get a GPS fix. Turn on Location/GPS and try again.';
-    else if(err&&err.code===3)msg='GPS took too long to respond. Move near a window/open area and try again.';
+    if(err&&err.code===1)msg='Location permission was denied. Allow location access for this site, then try again.';
+    else if(err&&err.code===2)msg='Your phone could not get a location fix. Turn on Location/GPS and try again.';
+    else if(err&&err.code===3)msg='Location took too long to respond. Turn on Location/GPS and try again near a window or outside.';
     else if(err&&err.message)msg=err.message;
+    setGpsPanel('<strong>GPS could not be completed</strong><br>'+escDetail(msg)+'<span class="gpsMeta">Your manually entered address, PIN, city and state remain unchanged.</span>','error');
     setLocationStatus(msg,'error');
   }finally{locationBtn.disabled=false;}
 }
 locationBtn?.addEventListener('click',useCurrentLocation);
-
 async function initCheckout(){
   try{
     const [sr,pr]=await Promise.all([fetch('/api/site-config',{cache:'no-store'}),fetch('/api/products',{cache:'no-store'})]);
@@ -319,6 +374,14 @@ function refreshCheckoutStep(){
 }
 document.getElementById('checkoutForm')?.addEventListener('input',refreshCheckoutStep);
 document.getElementById('checkoutForm')?.addEventListener('change',refreshCheckoutStep);
+['customerAddress','customerPin','customerCity','customerState'].forEach(id=>{
+ const el=document.getElementById(id); el?.addEventListener('input',()=>{
+   if(id==='customerPin' && currentField('customerPin') && gpsSuggestion.pin && currentField('customerPin')===gpsSuggestion.pin){
+     setGpsPanel(gpsPanel?.innerHTML||'', 'ok');
+   }
+   refreshCheckoutStep();
+ });
+});
 refreshCheckoutStep();
 function renderDiscountRow(){const row=document.getElementById('sumDiscountRow');if(!row)return;if(discount>0){row.style.display='';document.getElementById('sumDiscountLabel').textContent='Discount'+(appliedCoupon?' ('+appliedCoupon+')':'');document.getElementById('sumDiscount').textContent='-'+money(discount);}else{row.style.display='none';}}
 async function applyCoupon(){const code=document.getElementById('couponCode').value.trim();if(!code)return;try{const r=await fetch('/api/coupons/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,subtotal})});const d=await r.json();if(!r.ok)throw Error(d.error);discount=Number(d.discount||0);appliedCoupon=d.code;total=subtotal-discount+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total);document.getElementById('couponMsg').textContent='Coupon applied: '+money(discount)+' off';}catch(e){document.getElementById('couponMsg').textContent=e.message;discount=0;appliedCoupon='';total=subtotal+shipping;renderDiscountRow();document.getElementById('sumTotal').textContent=money(total)}}

@@ -163,18 +163,44 @@ async function api(req,res,p){
      const lat=Number(new URL(req.url,'http://localhost').searchParams.get('lat'));
      const lon=Number(new URL(req.url,'http://localhost').searchParams.get('lon'));
      if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return send(res,400,{error:'Invalid location coordinates'},'application/json',origin);
-     const rr=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon),{headers:{'User-Agent':'YOUR-TYPE/1.0 (delivery address lookup)'},signal:AbortSignal.timeout(8000)});
-     if(!rr.ok)throw new Error('Reverse geocoding failed');
-     const d=await rr.json(); const a=d.address||{};
-     // Keep the delivery locality separate from Delhi's administrative district.
-     // Nominatim may return values such as "North East Delhi" in district;
-     // that must never become the customer's City/Town field.
-     const locality=String(a.neighbourhood||a.suburb||a.quarter||a.village||a.town||a.city||'').trim();
-     let city=String(a.city||a.town||a.village||a.municipality||'').trim();
-     const state=String(a.state||'').trim();
-     if(/^delhi$/i.test(state)||/delhi/i.test(state)) city='Delhi';
-     if(!city&&/delhi/i.test(String(a.state_district||'')))city='Delhi';
-     return send(res,200,{displayName:String(d.display_name||''),pin:String(a.postcode||''),state,city,locality,address:[a.house_number,a.road].filter(Boolean).join(', '),district:String(a.state_district||a.county||'').trim()},'application/json',origin);
+
+     // Ask two independent reverse-geocoding services for the same GPS point.
+     // We use their agreement as a confidence signal for postal PINs. A single
+     // reverse-geocoder result must never silently overwrite customer-entered data.
+     const nominatimUrl='https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon);
+     const bigDataUrl='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(lat)+'&longitude='+encodeURIComponent(lon)+'&localityLanguage=en';
+     const [nr,br]=await Promise.allSettled([
+       fetch(nominatimUrl,{headers:{'User-Agent':'YOUR-TYPE/1.0 (delivery address lookup)'},signal:AbortSignal.timeout(9000)}).then(async r=>r.ok?r.json():null),
+       fetch(bigDataUrl,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(9000)}).then(async r=>r.ok?r.json():null)
+     ]);
+     const n=nr.status==='fulfilled'?nr.value:null;
+     const b=br.status==='fulfilled'?br.value:null;
+     if(!n&&!b)throw new Error('Reverse geocoding failed');
+
+     const cleanPin=v=>String(v||'').replace(/\D/g,'').slice(0,6);
+     const nAddr=n?.address||{};
+     const nPin=cleanPin(nAddr.postcode);
+     const bPin=cleanPin(b?.postcode);
+     const pin=(nPin||bPin);
+     const pinConfidence=(nPin&&bPin&&nPin===bPin)?'confirmed':(nPin||bPin?'single-source':'unknown');
+     const pinConflict=Boolean(nPin&&bPin&&nPin!==bPin);
+
+     const nState=String(nAddr.state||'').trim();
+     const bState=String(b?.principalSubdivision||'').trim();
+     const state=nState||bState;
+     let city=String(nAddr.city||nAddr.town||nAddr.village||nAddr.municipality||'').trim()||String(b?.city||b?.localityInfo?.administrative?.[2]?.name||'').trim();
+     if(/^delhi$/i.test(state)||/delhi/i.test(state)||/delhi/i.test(city))city='Delhi';
+     if(!city&&/delhi/i.test(String(nAddr.state_district||'')))city='Delhi';
+     const locality=String(nAddr.neighbourhood||nAddr.suburb||nAddr.quarter||nAddr.village||nAddr.town||b?.locality||b?.city||city||'').trim();
+     const district=String(nAddr.state_district||nAddr.county||b?.localityInfo?.administrative?.[3]?.name||'').trim();
+     const road=String(nAddr.road||'').trim();
+     const houseNumber=String(nAddr.house_number||'').trim();
+     const source=n&&b?'nominatim+bigdatacloud':(n?'nominatim':'bigdatacloud');
+     return send(res,200,{
+       displayName:String(n?.display_name||[b?.locality,b?.city,b?.principalSubdivision,b?.postcode].filter(Boolean).join(' · ')||''),
+       pin,state,city,locality,district,address:[houseNumber,road].filter(Boolean).join(', '),source,
+       pinConfidence,pinConflict,nominatimPin:nPin,bigDataCloudPin:bPin
+     },'application/json',origin);
    }catch(e){return send(res,503,{error:'Location address lookup is temporarily unavailable. Please enter the address manually.'},'application/json',origin)}
   }
   if(req.method==='GET'&&p.startsWith('/api/reviews/')){const name=decodeURIComponent(p.slice('/api/reviews/'.length));return send(res,200,{reviews:db.reviews.filter(r=>r.product===name&&r.status!=='rejected').slice(-50).reverse()},'application/json',origin)}

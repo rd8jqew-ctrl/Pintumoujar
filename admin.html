@@ -1618,211 +1618,182 @@ async function restoreServerBackup(){
 </script>
 <script src="/music-player.js" defer></script>
 <script>
-/* YOUR TYPE — PREMIUM INVOICE / PACKING SLIP PDF
-   Only replaces the PDF renderer. Existing order/admin behaviour remains unchanged.
-*/
+/* YOUR TYPE — PACKING SLIP / INVOICE PDF (HTML template -> PDF)
+   Layout is designed in HTML/CSS, drawn to canvas and saved as an A4 PDF.
+   If the PDF libraries can't load, it opens a print-ready page (Save as PDF). */
 (function(){
-  const JSPDF_CDN='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-  const QR_CDN='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  let pdfReady=null;
-  const escText=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
-  const money2=v=>'Rs. '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
-  const safeFile=v=>String(v||'ORDER').replace(/[^A-Za-z0-9_-]/g,'');
+  const LIBS={
+    h2c:'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+    pdf:'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
+    qr:'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    bar:'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js'
+  };
+  const FONT='https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Caveat:wght@600&display=swap';
+  const E=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const num=v=>Number(String(v??0).replace(/[^0-9.-]/g,''))||0;
+  const inr=n=>'₹ '+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+  const safeFile=v=>String(v||'ORDER').replace(/[^A-Za-z0-9_-]/g,'');
+  const loaded={};
+  function lib(k,test){
+    if(test())return Promise.resolve(true);
+    if(loaded[k])return loaded[k];
+    return loaded[k]=new Promise(res=>{const s=document.createElement('script');s.src=LIBS[k];s.onload=()=>res(test());s.onerror=()=>res(false);document.head.appendChild(s)});
+  }
+  function loadFont(){
+    if(document.getElementById('ytSlipFont'))return;
+    const l=document.createElement('link');l.id='ytSlipFont';l.rel='stylesheet';l.href=FONT;document.head.appendChild(l);
+  }
+  function toDataUrl(url){
+    if(!url)return Promise.resolve('');
+    if(/^data:/.test(url))return Promise.resolve(url);
+    return new Promise(res=>{try{const im=new Image();im.crossOrigin='anonymous';
+      im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);res(c.toDataURL('image/jpeg',.9))}catch(_){res('')}};
+      im.onerror=()=>res('');im.src=new URL(url,location.href).href}catch(_){res('')}});
+  }
+  function productFor(it,o){
+    const ps=state.products||[],id=it.productId||o.productId,sku=String(it.sku||o.sku||'').toLowerCase(),nm=String(it.name||o.productName||'').toLowerCase();
+    return ps.find(p=>id!=null&&String(p.id)===String(id))||ps.find(p=>sku&&String(p.sku||'').toLowerCase()===sku)||ps.find(p=>nm&&String(p.name||'').toLowerCase()===nm)||{};
+  }
+  function itemsOf(o){
+    const raw=Array.isArray(o.items)&&o.items.length?o.items:[o];
+    return raw.map(it=>{const p=productFor(it,o);return{
+      name:p.name||it.name||o.productName||'Product',
+      desc:p.tagline||p.description||'',
+      sku:p.sku||it.sku||o.sku||'—',
+      hsn:p.hsn||it.hsn||'6109',
+      size:it.size||o.size||'—',color:it.color||o.color||'',
+      qty:Math.max(1,Math.floor(num(it.qty||o.qty||1))),
+      price:num(it.price||p.price||o.price),
+      image:p.image||(Array.isArray(p.images)?p.images[0]:'')||it.image||o.image||''}});
+  }
+  const STATES={560:'Karnataka',110:'Delhi',400:'Maharashtra',600:'Tamil Nadu',500:'Telangana',700:'West Bengal',380:'Gujarat',302:'Rajasthan',201:'Uttar Pradesh',226:'Uttar Pradesh'};
+  function addrLines(o){
+    const a=String(o.address||'').replace(/\s+/g,' ').trim(),pin=String(o.pin||(a.match(/\b\d{6}\b/)||[''])[0]).trim();
+    const st=o.state||STATES[pin.slice(0,3)]||'';
+    const cityPin=[o.city,pin].filter(Boolean).join(' - ');
+    return [a,cityPin,st?st+', India':'India'].filter(Boolean);
+  }
+  const CSS=`.ys{width:794px;background:#f7f7f6;color:#0d0f10;font:11px/1.4 Archivo,Arial,sans-serif;display:flex;flex-direction:column;min-height:1123px}
+.ys *{box-sizing:border-box;margin:0;padding:0}
+.ys .hd{background:#0d0f10;color:#fff;padding:22px 34px;display:flex;justify-content:space-between;align-items:center}
+.ys .logo{font-weight:800;font-size:34px;letter-spacing:1px;line-height:1}.ys .logo sup{font-size:9px;font-weight:400}
+.ys .sub{letter-spacing:5px;font-size:9px;margin-top:6px}
+.ys .tag{letter-spacing:4px;font-size:9px;text-align:right;line-height:1.9;border-bottom:1px solid #fff;padding-bottom:8px}
+.ys .body{padding:18px 22px;flex:1;display:flex;flex-direction:column;gap:12px}
+.ys .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.ys h1{font-size:34px;font-weight:800;letter-spacing:1px}
+.ys .top p{letter-spacing:4px;color:#666;margin-top:4px;font-size:10px}
+.ys .box{background:#efefef;border-radius:6px;padding:12px 14px}
+.ys .oid{min-width:250px}.ys .oid b{display:block;font-size:15px;margin:3px 0 6px}
+.ys .lbl{font-size:8.5px;letter-spacing:1.5px;color:#333;text-transform:uppercase;font-weight:600}
+.ys .small{font-size:9px;color:#666;margin-top:4px}
+.ys .bar{height:38px;margin-top:2px}.ys .bar svg{height:38px;width:100%}
+.ys .strip{display:grid;grid-template-columns:repeat(4,1fr);padding:0}
+.ys .strip>div{padding:12px 14px;border-right:1px solid #d9d9d9}.ys .strip>div:last-child{border:0}
+.ys .strip b{display:block;font-size:12.5px;margin:4px 0 2px}
+.ys .addr{display:grid;grid-template-columns:1fr 1fr .9fr}
+.ys .addr>div{padding:6px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
+.ys .addr>div:last-child{border:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.ys .addr b{display:block;font-size:12px;margin:3px 0}
+.ys .script{font-family:Caveat,cursive;font-size:24px;line-height:1.1;transform:rotate(-6deg)}
+.ys table{width:100%;border-collapse:collapse;background:#fafafa}
+.ys th{background:#0d0f10;color:#fff;font-size:8.5px;letter-spacing:1.5px;text-align:left;padding:10px 8px;text-transform:uppercase}
+.ys td{padding:10px 8px;border:1px solid #d9d9d9;vertical-align:middle}
+.ys .r{text-align:right}.ys .c{text-align:center}
+.ys .prod{display:flex;gap:10px;align-items:center}
+.ys .ph{width:56px;height:56px;background:#ddd;border-radius:3px;flex:none;object-fit:cover}
+.ys .prod b{display:block;font-size:11.5px;text-transform:uppercase}
+.ys .mid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;align-items:start}
+.ys .badges{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;gap:6px;padding-top:14px}
+.ys .badges div{font-size:8px;letter-spacing:1px;color:#333;text-transform:uppercase;line-height:1.5}
+.ys .badges span{display:block;font-size:20px;margin-bottom:4px}
+.ys .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #d9d9d9;font-size:10.5px}
+.ys .disc{color:#1c7a3c}
+.ys .grand{background:#0d0f10;color:#fff;border-radius:5px;padding:10px 12px;margin-top:6px;display:flex;justify-content:space-between;font-weight:800;font-size:16px}
+.ys .cod{border:2px dashed #000;border-radius:6px;padding:8px 12px;margin-top:8px;text-align:center}.ys .cod b{font-size:17px;display:block}
+.ys .info{display:grid;grid-template-columns:1.2fr 1.4fr 1fr;padding:0}
+.ys .info>div{padding:12px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
+.ys .info>div:last-child{border:0;display:flex;align-items:center;justify-content:center}
+.ys .qr{width:74px;height:74px;flex:none;background:#fff;padding:2px}.ys .qr img{width:100%;height:100%}
+.ys .trk{display:flex;gap:12px;align-items:center}
+.ys .notes{font-size:9px;color:#666;line-height:1.6;padding:0 4px}
+.ys .hp .row,.ys .hp .grand,.ys .hp>.small{display:none}
+.ys .ntw{display:flex;gap:12px}.ys .nt{flex:1;background:#fff;border:1px solid #d9d9d9;border-radius:6px;padding:10px 14px;font-size:10.5px;line-height:1.5}
+.ys .nt.fr{background:#0d0f10;color:#fff;border-color:#0d0f10;font-weight:800;letter-spacing:1px}.ys .nt.fr .lbl{color:#ccc}
+.ys .ft{background:#0d0f10;color:#fff;padding:14px 34px;display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:3px}
+.ys .ft .logo{font-size:17px;letter-spacing:.5px}.ys .ft .sub{font-size:6px;letter-spacing:3px;margin-top:2px}.ys .ft .w{letter-spacing:0;font-size:10px}`;
 
-  function loadScriptOnce(src,test){return new Promise((resolve,reject)=>{
-    if(test&&test())return resolve();
-    const old=document.querySelector('script[data-yt-pdf-lib="'+src+'"]');
-    if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}
-    const sc=document.createElement('script');sc.src=src;sc.async=true;sc.dataset.ytPdfLib=src;sc.onload=resolve;sc.onerror=reject;document.head.appendChild(sc);
-  });}
-  function ensurePdfLibraries(){
-    // jsPDF is the only required external dependency. QR is optional so a QR/CDN
-    // failure can never force the PDF back to the old/basic renderer.
-    if(pdfReady)return pdfReady;
-    pdfReady=loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF);
-    return pdfReady;
+  async function template(o,kind){
+    const inv=kind==='invoice',items=itemsOf(o);
+    await Promise.all(items.map(async it=>it.img=await toDataUrl(it.image)));
+    const id=o.orderId||o.id||o.serverOrderId||'—';
+    const sub=num(o.subtotal)||items.reduce((s,i)=>s+i.price*i.qty,0);
+    const disc=num(o.discount),ship=num(o.shipping),rate=num(o.gstRate)||num(state.settings?.gst)||5;
+    const total=num(o.total)||Math.max(0,sub-disc)+ship;
+    const gst=num(o.gst)||Math.round(Math.max(0,sub-disc)*rate/(100+rate));
+    const isCOD=String(o.payment||'cod').toUpperCase()==='COD';
+    const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+    const A=addrLines(o).map(E).join('<br>'),name=E(o.customer||o.name||'—');
+    const contact=E(o.phone||'')+(o.email?'<br>'+E(o.email):'');
+    const gift=o.gift||o.isGift,giftMsg=o.giftMessage||o.giftMsg||'',note=o.note||o.notes||o.customerNote||o.instructions||'';
+    const hidePrice=!inv&&!!(gift||o.hidePrice);
+    const nb=(t,b,cls)=>`<div class="nt ${cls||''}"><span class="lbl">${t}</span><div>${b}</div></div>`;
+    const extra=(o.fragile||giftMsg||note)?`<div class="ntw">${o.fragile?nb('Handle with care','FRAGILE - PACK CAREFULLY','fr'):''}${giftMsg?nb('Gift message',E(giftMsg)):''}${note?nb('Order note',E(note)):''}</div>`:'';
+    const st=state.settings||{},web=(state.website||{});
+    const track=o.tracking_url||('https://yourtype.in/track?order='+encodeURIComponent(id));
+    let barSvg='';
+    if(await lib('bar',()=>window.JsBarcode)){try{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(s,String(id),{format:'CODE128',displayValue:false,height:38,margin:0,width:1.6});s.setAttribute('preserveAspectRatio','none');barSvg=s.outerHTML}catch(_){}}
+    let qrImg='';
+    if(await lib('qr',()=>window.QRCode)){try{const h=document.createElement('div');h.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(h);new QRCode(h,{text:track,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});await new Promise(r=>setTimeout(r,120));const c=h.querySelector('canvas');qrImg=c?c.toDataURL('image/png'):'';h.remove()}catch(_){}}
+    const rows=items.map((it,n)=>`<tr><td class="c">${n+1}</td><td><div class="prod">${it.img?`<img class="ph" src="${it.img}">`:'<div class="ph"></div>'}<div><b>${E(it.name)}</b>${E(it.desc)}</div></div></td><td class="c">${E(it.sku)}<div class="small">HSN ${E(it.hsn)}</div></td><td class="c"><b>${E(it.size)}${it.color?' / '+E(it.color):''}</b></td><td class="c">${it.qty}</td><td class="r">${hidePrice?'—':inr(it.price)}</td><td class="r"><b>${hidePrice?'—':inr(it.price*it.qty)}</b></td></tr>`).join('');
+    const qtyT=items.reduce((s,i)=>s+i.qty,0);
+    return `<div class="ys"><div class="hd"><div><div class="logo">YOUR TYPE<sup>™</sup></div><div class="sub">PREMIUM STREETWEAR</div></div><div class="tag">BETTER CLOTHES<br>BIGGER STORIES</div></div>
+<div class="body"><div class="top"><div><h1>${inv?'TAX INVOICE':'PACKING SLIP'}</h1><p>THANK YOU FOR YOUR ORDER</p><p style="letter-spacing:1px;font-size:11px">Items: ${qtyT}${o.weight?' &nbsp;|&nbsp; Wt: '+E(o.weight):''}${inv?' &nbsp;|&nbsp; Invoice date: '+E(date):''}</p></div>
+<div class="box oid"><div class="lbl">Order ID</div><b>${E(id)}</b><div class="bar">${barSvg}</div><div class="small">Scan for order tracking</div></div></div>
+<div class="box strip"><div><span class="lbl">Order date</span><b>${E(date)}</b></div><div><span class="lbl">Payment method</span><b>${isCOD?'COD':E(String(o.payment).toUpperCase())}</b><span class="small">${isCOD?'Cash on Delivery':'Paid online'}</span></div><div><span class="lbl">Order status</span><b>${E(o.status||'New')}</b><span class="small">${o.status==='Packed'?'Your order is ready':''}</span></div><div><span class="lbl">Delivery partner</span><b>${E(o.courier||'To be assigned')}</b><span class="small">${o.awb?'AWB: '+E(o.awb):'Tracking will be shared soon'}</span></div></div>
+<div class="addr"><div><span class="lbl">Shipping address</span><b>${name}</b>${A}<br><br>${contact}</div><div><span class="lbl">Billing address</span><b>${name}</b>${A}<br><br>${contact}</div><div><div class="script">Thank you<br>for choosing us!</div><div class="small" style="margin-top:10px">— YOUR TYPE —</div></div></div>
+<table><thead><tr><th class="c">S.No</th><th>Product details</th><th class="c">SKU</th><th class="c">Size / Color</th><th class="c">Qty</th><th class="r">Unit price</th><th class="r">Total</th></tr></thead><tbody>${rows}</tbody></table>
+${extra}<div class="mid"><div class="badges"><div><span>✔</span>Premium<br>quality</div><div><span>🚚</span>Fast &amp; reliable<br>delivery</div><div><span>♻</span>Sustainable<br>packaging</div><div><span>☎</span>24/7<br>support</div></div>
+<div class="box${hidePrice?' hp':''}"><div class="row"><span>SUBTOTAL</span><b>${inr(sub)}</b></div><div class="row"><span>SHIPPING</span><b>${ship?inr(ship):'FREE'}</b></div>${disc?`<div class="row disc"><span>DISCOUNT${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(disc)}</b></div>`:''}<div class="row"><span>GST (Incl. ${rate}%)</span><b>${inr(gst)}</b></div><div class="grand"><span>TOTAL</span><span>${inr(total)}</span></div><div class="small">(Includes GST of Rs. ${gst} at ${rate}%)</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">Collect from customer (COD)</span><b>${inr(total)}</b></div>`:'<div class="cod"><b>PREPAID - DO NOT COLLECT</b></div>'):''}</div></div>
+<div class="box info"><div><div class="trk">${qrImg?`<div class="qr"><img src="${qrImg}"></div>`:''}<div><span class="lbl">Track your order</span><div class="small">Scan the QR code or visit<br><b style="color:#000">yourtype.in/track</b></div></div></div></div><div><span class="lbl">Ship to</span><b style="display:block">${name}</b>${E(addrLines(o).join(', '))}<br>${E(o.phone||'')}</div><div><div class="script">Built for<br>Real Ones</div></div></div>
+<div class="notes"><b>Sold by:</b> Your Type${st.gstin?' &nbsp;|&nbsp; GSTIN: '+E(st.gstin):''}${st.address?' &nbsp;|&nbsp; Return address: '+E(st.address):''}<br>Returns / exchange within 7 days of delivery with tags intact and original packaging.${web.email||web.phone?' Help: '+E([web.email,web.phone].filter(Boolean).join(' | ')):''}${!inv?'<br><br>Packed by: ____________ &nbsp;&nbsp; Checked by: ____________ &nbsp;&nbsp; Date: ____________':''}<br>This is a computer-generated document; no signature required.</div></div>
+<div class="ft"><div><div class="logo">YOUR TYPE™</div><div class="sub">PREMIUM STREETWEAR</div></div><div>THANK YOU &nbsp;/&nbsp; STAY STYLISH</div><div class="w">www.yourtype.in</div></div></div>`;
   }
 
-  function productForItem(it,o){
-    const id=it?.productId||o?.productId;
-    const sku=escText(it?.sku||o?.sku);
-    const name=escText(it?.name||o?.productName);
-    const products=state.products||[];
-    return products.find(p=>id!=null && String(p.id)===String(id))
-      || products.find(p=>sku && String(p.sku||'').toLowerCase()===sku.toLowerCase())
-      || products.find(p=>name && String(p.name||'').toLowerCase()===name.toLowerCase())
-      || null;
-  }
-  function itemList(o){
-    if(Array.isArray(o.items)&&o.items.length)return o.items.map(it=>{
-      const p=productForItem(it,o)||{};
-      return {...it,
-        name:p.name||it.name||o.productName||'Product',
-        sku:p.sku||it.sku||'',
-        image:p.image||(Array.isArray(p.images)?p.images[0]:'')||it.image||'',
-        price:num(it.price||p.price||o.price),
-        qty:Math.max(1,Math.floor(num(it.qty||1))),
-        size:it.size||o.size||'',color:it.color||o.color||'Black'
-      };
-    });
-    const p=productForItem(o,o)||{};
-    return [{productId:o.productId||'',name:o.productName||p.name||'Product',sku:o.sku||p.sku||'',image:o.image||p.image||(Array.isArray(p.images)?p.images[0]:'')||'',price:num(o.price||p.price),qty:Math.max(1,Math.floor(num(o.qty||1))),size:o.size||'',color:o.color||'Black'}];
-  }
-  function stateFromOrder(o){
-    const direct=escText(o.state||o.stateName||o.province||o.region);
-    if(direct)return direct;
-    const text=escText(o.address);
-    const m=text.match(/\b(Karnataka|Kerala|Tamil Nadu|Telangana|Andhra Pradesh|Maharashtra|Delhi|Gujarat|Rajasthan|West Bengal|Uttar Pradesh|Madhya Pradesh|Bihar|Odisha|Punjab|Haryana|Goa|Jharkhand|Chhattisgarh|Assam|Uttarakhand|Himachal Pradesh|Jammu and Kashmir|Jammu & Kashmir|Sikkim|Meghalaya|Manipur|Mizoram|Nagaland|Tripura|Arunachal Pradesh)\b/i);
-    if(m)return m[1];
-    const pin=escText(o.pin||'').replace(/\D/g,'');
-    if(/^560/.test(pin))return 'Karnataka';
-    if(/^110/.test(pin))return 'Delhi';
-    if(/^400/.test(pin))return 'Maharashtra';
-    if(/^600/.test(pin))return 'Tamil Nadu';
-    if(/^500/.test(pin))return 'Telangana';
-    if(/^700/.test(pin))return 'West Bengal';
-    if(/^380/.test(pin))return 'Gujarat';
-    if(/^302/.test(pin))return 'Rajasthan';
-    if(/^201|^226/.test(pin))return 'Uttar Pradesh';
-    return 'State not provided';
-  }
-  function addressLines(o){
-    const addr=escText(o.address||'—');
-    const city=escText(o.city||'');
-    const pin=escText(o.pin||'');
-    const st=stateFromOrder(o);
-    return [addr,city?city+(pin?' - '+pin:''):pin,st].filter(Boolean);
-  }
-  function imageData(url){
-    if(!url)return Promise.resolve(null);
-    return new Promise(resolve=>{
-      try{
-        const im=new Image();im.crossOrigin='anonymous';
-        im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);resolve(c.toDataURL('image/jpeg',.88));}catch(_){resolve(null)}};
-        im.onerror=()=>resolve(null);
-        im.src=new URL(url,location.href).href;
-      }catch(_){resolve(null)}
-    });
-  }
-  async function qrData(text){
+  async function generate(id,kind){
+    const o=(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));
+    if(!o){toast('Order not found');return}
+    toast(kind==='invoice'?'Preparing invoice…':'Preparing packing slip…');
+    loadFont();
+    const fname='YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.orderId||o.id||'ORDER');
     try{
-      if(!window.QRCode)return null;
-      const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:-9999px;width:240px;height:240px;background:#fff';document.body.appendChild(holder);
-      new QRCode(holder,{text:String(text||''),width:240,height:240,colorDark:'#111',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
-      await new Promise(r=>setTimeout(r,100));
-      const c=holder.querySelector('canvas');const out=c?c.toDataURL('image/png'):null;holder.remove();return out;
-    }catch(_){return null}
-  }
-  function textFit(doc,text,x,y,maxW,maxLines,size,bold){
-    doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(25,25,25);
-    doc.text(doc.splitTextToSize(escText(text)||'—',maxW).slice(0,maxLines),x,y);
-  }
-  function drawTop(doc,o,kind){
-    const W=210,M=10;
-    doc.setFillColor(12,12,12);doc.rect(0,0,W,31,'F');
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text('YOUR TYPE',M,14);
-    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text('PREMIUM STREETWEAR',M,22);
-    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(kind==='invoice'?'TAX INVOICE':'PACKING SLIP',W-M,13,{align:'right'});
-    doc.setFont('helvetica','normal');doc.setFontSize(6);doc.text('BETTER CLOTHES   /   BIGGER STORIES',W-M,21,{align:'right'});
-    doc.setFillColor(245,245,245);doc.roundedRect(W-73,37,63,19,3,3,'F');
-    doc.setTextColor(90,90,90);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text('ORDER ID',W-68,43);
-    doc.setTextColor(20,20,20);doc.setFontSize(8.5);doc.text(escText(o.orderId||o.id||o.serverOrderId||'—'),W-68,50);
-  }
-  function infoCard(doc,x,y,w,h,title,lines){
-    doc.setFillColor(249,249,249);doc.setDrawColor(225,225,225);doc.roundedRect(x,y,w,h,2.5,2.5,'FD');
-    doc.setTextColor(90,90,90);doc.setFont('helvetica','bold');doc.setFontSize(5.8);doc.text(title,x+5,y+6);
-    let yy=y+13;
-    lines.forEach((line,i)=>{if(!line)return;doc.setFont('helvetica',i===0?'bold':'normal');doc.setFontSize(i===0?8:6.5);doc.setTextColor(i===0?25:75,i===0?25:75,i===0?25:75);doc.text(doc.splitTextToSize(String(line),w-10).slice(0,2),x+5,yy);yy+=i===0?8:7});
-  }
-  async function buildPremiumPdf(o,kind){
-    await ensurePdfLibraries();
-    if(!window.jspdf?.jsPDF)throw new Error('PDF library unavailable');
-    const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-    const W=210,M=10,contentW=W-2*M;drawTop(doc,o,kind);let y=64;
-    const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-    const payment=String(o.payment||'cod').toUpperCase()==='COD'?'COD / CASH ON DELIVERY':String(o.payment||'').toUpperCase();
-    const status=escText(o.status||'New');const courier=escText(o.courier||'Tracking pending');
-    doc.setFillColor(246,246,246);doc.setDrawColor(225,225,225);doc.roundedRect(M,y,contentW,24,2.5,2.5,'FD');
-    const stats=[['ORDER DATE',date],['PAYMENT METHOD',payment],['ORDER STATUS',status],['DELIVERY PARTNER',courier]];const sw=contentW/4;
-    stats.forEach((s,i)=>{const x=M+i*sw;if(i){doc.setDrawColor(215,215,215);doc.line(x,y+4,x,y+20)}doc.setTextColor(95,95,95);doc.setFont('helvetica','bold');doc.setFontSize(5.6);doc.text(s[0],x+5,y+7);doc.setTextColor(25,25,25);doc.setFontSize(7.2);doc.text(doc.splitTextToSize(s[1],sw-10).slice(0,2),x+5,y+14)});
-    y+=31;
-    const ship=addressLines(o);const billing=ship.slice();
-    infoCard(doc,M,y,92,43,'SHIPPING ADDRESS',[o.customer||o.name||'—',...ship,'Phone: '+(o.phone||'—')]);
-    infoCard(doc,M+96,y,94,43,'BILLING ADDRESS',[o.customer||o.name||'—',...billing,'Phone: '+(o.phone||'—')]);
-    y+=49;
-    const items=itemList(o);const tableX=M,tableW=contentW,headerH=9,rowH=32;
-    const cols=[9,68,25,27,14,30,27];const labels=['#','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
-    doc.setFillColor(14,14,14);doc.setTextColor(255,255,255);doc.roundedRect(tableX,y,tableW,headerH,2,2,'F');let x=tableX;
-    labels.forEach((l,i)=>{doc.setFont('helvetica','bold');doc.setFontSize(5.4);doc.text(l,x+3,y+6);x+=cols[i]});y+=headerH;
-    for(let i=0;i<items.length;i++){
-      const it=items[i];doc.setFillColor(i%2?252:248,i%2?252:248,i%2?252:248);doc.setDrawColor(225,225,225);doc.rect(tableX,y,tableW,rowH,'FD');x=tableX;
-      doc.setTextColor(35,35,35);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(String(i+1),x+3,y+14);x+=cols[0];
-      const im=await imageData(it.image);if(im){try{doc.addImage(im,'JPEG',x+2,y+3,25,25);}catch(_){} }
-      textFit(doc,it.name,x+29,y+10,cols[1]-33,2,7.3,true);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.setTextColor(100,100,100);doc.text('YOUR TYPE / PREMIUM STREETWEAR',x+29,y+20);x+=cols[1];
-      textFit(doc,it.sku||'—',x+3,y+14,cols[2]-6,2,6.2,false);x+=cols[2];
-      textFit(doc,(it.size||'—')+' / '+(it.color||'—'),x+3,y+14,cols[3]-6,2,6.2,false);x+=cols[3];
-      textFit(doc,String(it.qty||1),x+4,y+14,cols[4]-5,1,6.5,false);x+=cols[4];
-      textFit(doc,money2(it.price),x+2,y+14,cols[5]-5,2,6.2,false);x+=cols[5];
-      doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text(money2(num(it.price)*num(it.qty||1)),x+2,y+14);
-      y+=rowH;
+      const html=await template(o,kind);
+      const ok=await Promise.all([lib('h2c',()=>window.html2canvas),lib('pdf',()=>window.jspdf&&window.jspdf.jsPDF)]);
+      if(!ok[0]||!ok[1])throw new Error('libs');
+      const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';
+      host.innerHTML='<style>'+CSS+'</style>'+html;document.body.appendChild(host);
+      try{await document.fonts.ready}catch(_){}
+      await new Promise(r=>setTimeout(r,250));
+      const node=host.querySelector('.ys');
+      const cv=await html2canvas(node,{scale:2,backgroundColor:'#f7f7f6',useCORS:true,logging:false});
+      host.remove();
+      const {jsPDF}=window.jspdf,pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+      let h=210*cv.height/cv.width,w=210;if(h>297){w=210*297/h;h=297}
+      pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',(210-w)/2,0,w,h);
+      pdf.save(fname+'.pdf');
+      toast(kind==='invoice'?'Invoice downloaded':'Packing slip downloaded');
+    }catch(e){
+      console.error('PDF failed, opening print view:',e);
+      try{
+        const html=await template(o,kind),w=window.open('','_blank');
+        if(!w){toast('Popup blocked - allow popups and try again');return}
+        w.document.write('<!doctype html><title>'+fname+'</title><link href="'+FONT+'" rel="stylesheet"><style>@page{size:A4;margin:0}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+CSS+'</style>'+html+'<script>setTimeout(function(){print()},700)<\/script>');
+        w.document.close();toast('Print view opened - choose "Save as PDF"');
+      }catch(err){console.error(err);toast('Unable to create PDF')}
     }
-    y+=7;
-    const itemsSum=items.reduce((s,it)=>s+num(it.price)*Math.max(1,num(it.qty)),0);
-    const subtotal=num(o.subtotal||itemsSum),discount=num(o.discount),shipping=num(o.shipping),gst=num(o.gst),total=num(o.total||Math.max(0,subtotal-discount)+shipping);
-    const sumX=105,sumW=95;doc.setFillColor(247,247,247);doc.setDrawColor(225,225,225);doc.roundedRect(sumX,y,sumW,58,3,3,'FD');let ty=y+9;
-    const totalRow=(label,val,opts={})=>{doc.setTextColor(...(opts.color||[75,75,75]));doc.setFont('helvetica',opts.bold?'bold':'normal');doc.setFontSize(opts.size||6.8);doc.text(label,sumX+6,ty);doc.text(val,sumX+sumW-6,ty,{align:'right'});ty+=8};
-    totalRow('SUBTOTAL',money2(subtotal));if(discount)totalRow('DISCOUNT'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money2(discount),{color:[20,125,70]});totalRow('SHIPPING',shipping?money2(shipping):'FREE');
-    doc.setDrawColor(30,30,30);doc.line(sumX+6,ty-3,sumX+sumW-6,ty-3);ty+=2;totalRow('TOTAL',money2(total),{bold:true,size:10,color:[15,15,15]});
-    if(gst){doc.setFont('helvetica','normal');doc.setFontSize(5.2);doc.setTextColor(110,110,110);doc.text('Includes GST '+money2(gst)+' at '+num(o.gstRate)+'%',sumX+6,ty)}
-    const qrPayload=o.tracking_url||('https://yourtype.in/track?order='+encodeURIComponent(o.orderId||o.id||''));const qr=await qrData(qrPayload);
-    const qx=M,qy=y,qw=86;doc.setFillColor(255,255,255);doc.setDrawColor(225,225,225);doc.roundedRect(qx,qy,qw,58,3,3,'FD');
-    if(qr)doc.addImage(qr,'PNG',qx+5,qy+5,38,38);
-    doc.setTextColor(25,25,25);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text('TRACK YOUR ORDER',qx+48,qy+11);doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(95,95,95);doc.text(doc.splitTextToSize(o.tracking_url?'Scan to track shipment':'Scan for order details',31).slice(0,2),qx+48,qy+19);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.setTextColor(35,35,35);doc.text('AWB: '+(o.awb||'Not assigned'),qx+48,qy+34);doc.text('Courier: '+(o.courier||'Not assigned'),qx+48,qy+42);
-    if(o.verified){doc.setTextColor(25,120,70);doc.setFontSize(6.5);doc.text('✓ ADDRESS VERIFIED',qx+48,qy+51)}
-    const footY=Math.min(y+66,258);doc.setFillColor(12,12,12);doc.rect(0,footY,W,30,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('YOUR TYPE',M,footY+10);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('PREMIUM STREETWEAR',M,footY+17);doc.setFontSize(6);doc.text('THANK YOU FOR CHOOSING US.',W-M,footY+10,{align:'right'});doc.text('BETTER CLOTHES / BIGGER STORIES',W-M,footY+17,{align:'right'});doc.setFontSize(5.5);doc.text('yourtype.in',W-M,footY+24,{align:'right'});
-    doc.save('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.orderId||o.id||'ORDER')+'.pdf');
   }
-  function buildPremiumFallbackPdf(o,kind){
-    // Fully local fallback: if jsPDF/CDN is unavailable, NEVER fall back to the old
-    // plain invoice. This keeps the new premium layout visible and testable offline.
-    const W=595,H=842,M=34,doc=pdfDoc(W,H);
-    const items=itemList(o); let y=H-48;
-    doc.rect(0,0,W,108,{fill:[12,12,12],stroke:[12,12,12],width:0});
-    doc.txt(M,y,22,'YOUR TYPE',{font:'F2',color:[1,1,1]});
-    doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[.78,.78,.78],spacing:1.4});
-    doc.textRight(W-M,y,15,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2',color:[1,1,1]});
-    doc.textRight(W-M,y-15,8,'BETTER CLOTHES  /  BIGGER STORIES',{color:[.78,.78,.78]});
-    doc.rect(W-M-170,28,170,36,{fill:[.96,.96,.96],stroke:[.82,.82,.82],width:.6});
-    doc.txt(W-M-158,51,7,'ORDER ID',{font:'F2',color:[.35,.35,.35]});
-    doc.txt(W-M-158,39,11,String(o.orderId||o.id||'—'),{font:'F2'});
-    y=132;
-    const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-    const stats=[['ORDER DATE',date],['PAYMENT METHOD',String(o.payment||'COD').toUpperCase()],['ORDER STATUS',o.status||'New'],['DELIVERY PARTNER',o.courier||'Tracking pending']];
-    const sw=(W-2*M)/4;doc.rect(M,y,W-2*M,58,{fill:[.96,.96,.96],stroke:[.88,.88,.88],width:.6});
-    stats.forEach((a,i)=>{const x=M+i*sw;if(i)doc.line(x,y+8,x,y+50,{color:[.82,.82,.82],width:.6});doc.txt(x+10,y+18,7,a[0],{font:'F2',color:[.4,.4,.4],spacing:.4});doc.txt(x+10,y+36,9,String(a[1]).slice(0,28),{font:'F2'});});
-    y+=78;
-    const cardW=(W-2*M-16)/2;
-    const lines=addressLines(o);
-    function card(x,title){doc.rect(x,y,cardW,104,{fill:[.975,.975,.975],stroke:[.88,.88,.88],width:.6});doc.txt(x+10,y+16,7,title,{font:'F2',color:[.4,.4,.4],spacing:.5});doc.txt(x+10,y+35,10,o.customer||o.name||'—',{font:'F2'});let yy=y+51;lines.forEach(l=>{doc.txt(x+10,yy,8.5,String(l).slice(0,48),{color:[.28,.28,.28]});yy-=13});doc.txt(x+10,yy,8.5,'Phone: '+(o.phone||'—'),{color:[.28,.28,.28]});}
-    card(M,'SHIPPING ADDRESS');card(M+cardW+16,'BILLING ADDRESS');
-    y+=120;
-    doc.rect(M,y,W-2*M,30,{fill:[.05,.05,.05],stroke:[.05,.05,.05],width:.5});
-    const heads=['#','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
-    const xs=[M,M+26,M+260,M+320,M+405,M+450,M+W-2*M-8];
-    heads.forEach((h,i)=>doc.txt(xs[i],y+19,7,h,{font:'F2',color:[1,1,1]}));
-    y+=30;
-    items.slice(0,3).forEach((it,i)=>{doc.rect(M,y,W-2*M,58,{fill:i%2?[.99,.99,.99]:[.96,.96,.96],stroke:[.88,.88,.88],width:.5});doc.txt(M+5,y+32,8,String(i+1),{font:'F2'});doc.txt(M+32,y+22,10,String(it.name||'Product').slice(0,31),{font:'F2'});doc.txt(M+32,y+39,7,'YOUR TYPE / PREMIUM STREETWEAR',{color:[.45,.45,.45]});doc.txt(M+265,y+32,8,String(it.sku||'—').slice(0,12));doc.txt(M+325,y+32,8,(it.size||'—')+' / '+(it.color||'—'));doc.txt(M+410,y+32,8,String(it.qty||1));doc.txt(M+455,y+32,8,money2(it.price));doc.textRight(W-M-8,y+32,8,money2(num(it.price)*num(it.qty||1)),{font:'F2'});y+=58;});
-    const itemsSum=items.reduce((a,it)=>a+num(it.price)*Math.max(1,num(it.qty)),0);const subtotal=num(o.subtotal||itemsSum),discount=num(o.discount),shipping=num(o.shipping),gst=num(o.gst),total=num(o.total||Math.max(0,subtotal-discount)+shipping);
-    y+=14;const bx=W-M-225;doc.rect(bx,y,225,118,{fill:[.96,.96,.96],stroke:[.86,.86,.86],width:.6});let ty=y+22;function tr(l,v,c){doc.txt(bx+12,ty,9,l,{color:c||[.35,.35,.35]});doc.textRight(W-M-10,ty,9,v,{color:c||[.15,.15,.15]});ty-=19}tr('SUBTOTAL',money2(subtotal));if(discount)tr('DISCOUNT','- '+money2(discount),[.08,.5,.25]);tr('SHIPPING',shipping?money2(shipping):'FREE');doc.line(bx+12,ty+4,W-M-10,ty+4,{color:[.1,.1,.1],width:1});ty-=6;tr('TOTAL',money2(total),[.05,.05,.05]);
-    if(gst){doc.txt(bx+12,ty+2,7,'Includes GST '+money2(gst)+' at '+num(o.gstRate)+'%',{color:[.45,.45,.45]});}
-    y+=136;doc.rect(M,y,225,74,{fill:[1,1,1],stroke:[.88,.88,.88],width:.6});doc.txt(M+12,y+19,9,'TRACK YOUR ORDER',{font:'F2'});doc.txt(M+12,y+37,8,'AWB: '+(o.awb||'Not assigned'),{color:[.3,.3,.3]});doc.txt(M+12,y+52,8,'Courier: '+(o.courier||'Not assigned'),{color:[.3,.3,.3]});doc.txt(M+12,y+66,7,o.verified?'✓ ADDRESS VERIFIED':'Address verification pending',{font:'F2',color:o.verified?[.1,.5,.25]:[.55,.4,.05]});
-    doc.rect(0,H-54,W,54,{fill:[12,12,12],stroke:[12,12,12],width:0});doc.txt(M,H-30,10,'YOUR TYPE',{font:'F2',color:[1,1,1]});doc.txt(M,H-17,7,'PREMIUM STREETWEAR',{color:[.75,.75,.75]});doc.textRight(W-M,H-30,8,'THANK YOU FOR CHOOSING US.',{font:'F2',color:[1,1,1]});doc.textRight(W-M,H-17,7,'yourtype.in',{color:[.75,.75,.75]});
-    return doc.build();
-  }
-
-  async function generate(id,kind){const o=(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));if(!o){toast('Order not found');return}toast(kind==='invoice'?'Preparing invoice…':'Preparing packing slip…');try{await buildPremiumPdf(o,kind);toast(kind==='invoice'?'Invoice downloaded':'Packing slip downloaded')}catch(e){console.error('Premium PDF failed:',e);try{downloadText('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(id)+'.pdf',buildPremiumFallbackPdf(o,kind),'application/pdf');toast('Premium PDF downloaded (offline mode)')}catch(err){console.error(err);toast('Unable to create PDF')}}}
-  window.addressSlip=id=>generate(id,'slip');window.invoiceById=id=>generate(id,'invoice');
+  window.addressSlip=id=>generate(id,'slip');
+  window.invoiceById=id=>generate(id,'invoice');
 })();
 </script>
 

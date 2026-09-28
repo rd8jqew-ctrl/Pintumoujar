@@ -1636,14 +1636,23 @@ async function restoreServerBackup(){
     if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}
     const sc=document.createElement('script');sc.src=src;sc.async=true;sc.dataset.ytPdfLib=src;sc.onload=resolve;sc.onerror=reject;document.head.appendChild(sc);
   });}
-  function ensurePdfLibraries(){if(pdfReady)return pdfReady;pdfReady=Promise.all([
-    loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF),
-    loadScriptOnce(QR_CDN,()=>window.QRCode)
-  ]);return pdfReady;}
+  function ensurePdfLibraries(){
+    // jsPDF is the only required external dependency. QR is optional so a QR/CDN
+    // failure can never force the PDF back to the old/basic renderer.
+    if(pdfReady)return pdfReady;
+    pdfReady=loadScriptOnce(JSPDF_CDN,()=>window.jspdf&&window.jspdf.jsPDF);
+    return pdfReady;
+  }
 
   function productForItem(it,o){
     const id=it?.productId||o?.productId;
-    return (state.products||[]).find(p=>String(p.id)===String(id))||null;
+    const sku=escText(it?.sku||o?.sku);
+    const name=escText(it?.name||o?.productName);
+    const products=state.products||[];
+    return products.find(p=>id!=null && String(p.id)===String(id))
+      || products.find(p=>sku && String(p.sku||'').toLowerCase()===sku.toLowerCase())
+      || products.find(p=>name && String(p.name||'').toLowerCase()===name.toLowerCase())
+      || null;
   }
   function itemList(o){
     if(Array.isArray(o.items)&&o.items.length)return o.items.map(it=>{
@@ -1774,7 +1783,45 @@ async function restoreServerBackup(){
     const footY=Math.min(y+66,258);doc.setFillColor(12,12,12);doc.rect(0,footY,W,30,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('YOUR TYPE',M,footY+10);doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.text('PREMIUM STREETWEAR',M,footY+17);doc.setFontSize(6);doc.text('THANK YOU FOR CHOOSING US.',W-M,footY+10,{align:'right'});doc.text('BETTER CLOTHES / BIGGER STORIES',W-M,footY+17,{align:'right'});doc.setFontSize(5.5);doc.text('yourtype.in',W-M,footY+24,{align:'right'});
     doc.save('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(o.orderId||o.id||'ORDER')+'.pdf');
   }
-  async function generate(id,kind){const o=(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));if(!o){toast('Order not found');return}toast(kind==='invoice'?'Preparing invoice…':'Preparing packing slip…');try{await buildPremiumPdf(o,kind);toast(kind==='invoice'?'Invoice downloaded':'Packing slip downloaded')}catch(e){console.error(e);try{downloadText('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(id)+'.pdf',buildOrderPdf(o,kind),'application/pdf')}catch(_){toast('Unable to create PDF')}}}
+  function buildPremiumFallbackPdf(o,kind){
+    // Fully local fallback: if jsPDF/CDN is unavailable, NEVER fall back to the old
+    // plain invoice. This keeps the new premium layout visible and testable offline.
+    const W=595,H=842,M=34,doc=pdfDoc(W,H);
+    const items=itemList(o); let y=H-48;
+    doc.rect(0,0,W,108,{fill:[12,12,12],stroke:[12,12,12],width:0});
+    doc.txt(M,y,22,'YOUR TYPE',{font:'F2',color:[1,1,1]});
+    doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[.78,.78,.78],spacing:1.4});
+    doc.textRight(W-M,y,15,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2',color:[1,1,1]});
+    doc.textRight(W-M,y-15,8,'BETTER CLOTHES  /  BIGGER STORIES',{color:[.78,.78,.78]});
+    doc.rect(W-M-170,28,170,36,{fill:[.96,.96,.96],stroke:[.82,.82,.82],width:.6});
+    doc.txt(W-M-158,51,7,'ORDER ID',{font:'F2',color:[.35,.35,.35]});
+    doc.txt(W-M-158,39,11,String(o.orderId||o.id||'—'),{font:'F2'});
+    y=132;
+    const date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+    const stats=[['ORDER DATE',date],['PAYMENT METHOD',String(o.payment||'COD').toUpperCase()],['ORDER STATUS',o.status||'New'],['DELIVERY PARTNER',o.courier||'Tracking pending']];
+    const sw=(W-2*M)/4;doc.rect(M,y,W-2*M,58,{fill:[.96,.96,.96],stroke:[.88,.88,.88],width:.6});
+    stats.forEach((a,i)=>{const x=M+i*sw;if(i)doc.line(x,y+8,x,y+50,{color:[.82,.82,.82],width:.6});doc.txt(x+10,y+18,7,a[0],{font:'F2',color:[.4,.4,.4],spacing:.4});doc.txt(x+10,y+36,9,String(a[1]).slice(0,28),{font:'F2'});});
+    y+=78;
+    const cardW=(W-2*M-16)/2;
+    const lines=addressLines(o);
+    function card(x,title){doc.rect(x,y,cardW,104,{fill:[.975,.975,.975],stroke:[.88,.88,.88],width:.6});doc.txt(x+10,y+16,7,title,{font:'F2',color:[.4,.4,.4],spacing:.5});doc.txt(x+10,y+35,10,o.customer||o.name||'—',{font:'F2'});let yy=y+51;lines.forEach(l=>{doc.txt(x+10,yy,8.5,String(l).slice(0,48),{color:[.28,.28,.28]});yy-=13});doc.txt(x+10,yy,8.5,'Phone: '+(o.phone||'—'),{color:[.28,.28,.28]});}
+    card(M,'SHIPPING ADDRESS');card(M+cardW+16,'BILLING ADDRESS');
+    y+=120;
+    doc.rect(M,y,W-2*M,30,{fill:[.05,.05,.05],stroke:[.05,.05,.05],width:.5});
+    const heads=['#','PRODUCT DETAILS','SKU','SIZE / COLOR','QTY','UNIT PRICE','TOTAL'];
+    const xs=[M,M+26,M+260,M+320,M+405,M+450,M+W-2*M-8];
+    heads.forEach((h,i)=>doc.txt(xs[i],y+19,7,h,{font:'F2',color:[1,1,1]}));
+    y+=30;
+    items.slice(0,3).forEach((it,i)=>{doc.rect(M,y,W-2*M,58,{fill:i%2?[.99,.99,.99]:[.96,.96,.96],stroke:[.88,.88,.88],width:.5});doc.txt(M+5,y+32,8,String(i+1),{font:'F2'});doc.txt(M+32,y+22,10,String(it.name||'Product').slice(0,31),{font:'F2'});doc.txt(M+32,y+39,7,'YOUR TYPE / PREMIUM STREETWEAR',{color:[.45,.45,.45]});doc.txt(M+265,y+32,8,String(it.sku||'—').slice(0,12));doc.txt(M+325,y+32,8,(it.size||'—')+' / '+(it.color||'—'));doc.txt(M+410,y+32,8,String(it.qty||1));doc.txt(M+455,y+32,8,money2(it.price));doc.textRight(W-M-8,y+32,8,money2(num(it.price)*num(it.qty||1)),{font:'F2'});y+=58;});
+    const itemsSum=items.reduce((a,it)=>a+num(it.price)*Math.max(1,num(it.qty)),0);const subtotal=num(o.subtotal||itemsSum),discount=num(o.discount),shipping=num(o.shipping),gst=num(o.gst),total=num(o.total||Math.max(0,subtotal-discount)+shipping);
+    y+=14;const bx=W-M-225;doc.rect(bx,y,225,118,{fill:[.96,.96,.96],stroke:[.86,.86,.86],width:.6});let ty=y+22;function tr(l,v,c){doc.txt(bx+12,ty,9,l,{color:c||[.35,.35,.35]});doc.textRight(W-M-10,ty,9,v,{color:c||[.15,.15,.15]});ty-=19}tr('SUBTOTAL',money2(subtotal));if(discount)tr('DISCOUNT','- '+money2(discount),[.08,.5,.25]);tr('SHIPPING',shipping?money2(shipping):'FREE');doc.line(bx+12,ty+4,W-M-10,ty+4,{color:[.1,.1,.1],width:1});ty-=6;tr('TOTAL',money2(total),[.05,.05,.05]);
+    if(gst){doc.txt(bx+12,ty+2,7,'Includes GST '+money2(gst)+' at '+num(o.gstRate)+'%',{color:[.45,.45,.45]});}
+    y+=136;doc.rect(M,y,225,74,{fill:[1,1,1],stroke:[.88,.88,.88],width:.6});doc.txt(M+12,y+19,9,'TRACK YOUR ORDER',{font:'F2'});doc.txt(M+12,y+37,8,'AWB: '+(o.awb||'Not assigned'),{color:[.3,.3,.3]});doc.txt(M+12,y+52,8,'Courier: '+(o.courier||'Not assigned'),{color:[.3,.3,.3]});doc.txt(M+12,y+66,7,o.verified?'✓ ADDRESS VERIFIED':'Address verification pending',{font:'F2',color:o.verified?[.1,.5,.25]:[.55,.4,.05]});
+    doc.rect(0,H-54,W,54,{fill:[12,12,12],stroke:[12,12,12],width:0});doc.txt(M,H-30,10,'YOUR TYPE',{font:'F2',color:[1,1,1]});doc.txt(M,H-17,7,'PREMIUM STREETWEAR',{color:[.75,.75,.75]});doc.textRight(W-M,H-30,8,'THANK YOU FOR CHOOSING US.',{font:'F2',color:[1,1,1]});doc.textRight(W-M,H-17,7,'yourtype.in',{color:[.75,.75,.75]});
+    return doc.build();
+  }
+
+  async function generate(id,kind){const o=(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));if(!o){toast('Order not found');return}toast(kind==='invoice'?'Preparing invoice…':'Preparing packing slip…');try{await buildPremiumPdf(o,kind);toast(kind==='invoice'?'Invoice downloaded':'Packing slip downloaded')}catch(e){console.error('Premium PDF failed:',e);try{downloadText('YOUR_TYPE_'+(kind==='invoice'?'INVOICE_':'PACKING_SLIP_')+safeFile(id)+'.pdf',buildPremiumFallbackPdf(o,kind),'application/pdf');toast('Premium PDF downloaded (offline mode)')}catch(err){console.error(err);toast('Unable to create PDF')}}}
   window.addressSlip=id=>generate(id,'slip');window.invoiceById=id=>generate(id,'invoice');
 })();
 </script>

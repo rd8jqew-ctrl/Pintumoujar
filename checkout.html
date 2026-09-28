@@ -36,16 +36,6 @@
 .adChip:hover,.adChip.on{border-color:#cfcfcf;background:#141414}
 .adGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:560px){.adRow{grid-template-columns:1fr}.adGrid{grid-template-columns:1fr}.adLoc{width:100%}}
-.adSum{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px;background:linear-gradient(180deg,#101410,#0c0f0c);border:1px solid #2f5d3a}
-.adSum[hidden]{display:none!important}
-.adTick{width:26px;height:26px;border-radius:50%;background:#2f5d3a;color:#fff;display:grid;place-items:center;font-size:13px}
-.adSum b{display:block;font-size:14px;font-weight:600;letter-spacing:.3px;color:#f4f4f4}.adSum small{color:#8a8a8a;font-size:12px}
-.adSum button{background:none;border:0;color:#aaa;font:inherit;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-decoration:underline;padding:6px}
-.adGrid[hidden]{display:none!important}
-.adChip.on::after{content:" ✓";color:#7ee787}
-.adChip{min-width:140px}
-.trustRow{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;margin:6px 0 2px;font-size:11px;letter-spacing:1px;color:#8a8a8a}
-.adNear p{color:#cfcfcf}
 </style>
 </head>
 <body>
@@ -76,13 +66,12 @@
       <h3>Delivery address</h3>
       <section class="ad" id="adBox" aria-label="Delivery address">
         <div class="adRow">
-          <label class="adField adPin"><span>PIN code</span><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit PIN" autocomplete="postal-code"></label>
-          <button type="button" class="adLoc" id="adLocBtn">◎ Find my PIN</button>
+          <label class="adField adPin"><span>PIN code</span><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="postal-code"></label>
+          <button type="button" class="adLoc" id="adLocBtn">◎ Use my location</button>
         </div>
         <div class="adStatus" id="adStatus" role="status" aria-live="polite"></div>
         <div class="adNear" id="adNear" hidden></div>
-        <div class="adSum" id="adSum" hidden><span class="adTick">✓</span><div><b id="adSumMain"></b><small id="adSumSub"></small></div><button type="button" id="adEdit">Change</button></div>
-        <div class="adGrid" id="adGrid">
+        <div class="adGrid">
           <label class="adField"><span>State</span><select id="customerState" required autocomplete="address-level1"><option value="">Select state</option></select></label>
           <label class="adField"><span>City / District</span><input id="customerCity" required placeholder="City" autocomplete="address-level2"></label>
         </div>
@@ -95,7 +84,6 @@
       <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
       <small id="upiNote" style="display:none;color:#888;line-height:1.6">UPI option is enabled. Online gateway connection will be added later.</small>
-      <p class="trustRow"><span>🔒 Secure checkout</span><span>↩ 7-day returns</span><span>🚚 Ships in 1–3 days</span></p>
       <button class="checkout" type="submit">PLACE ORDER&nbsp;&nbsp; →</button>
     </form>
   </div>
@@ -247,7 +235,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOrderModal();})
  const $=id=>document.getElementById(id);
  const STATES=['Andaman and Nicobar Islands','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chandigarh','Chhattisgarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Goa','Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka','Kerala','Ladakh','Lakshadweep','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Puducherry','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal'];
  const stSel=$('customerState');STATES.forEach(x=>{const o=document.createElement('option');o.value=o.textContent=x;stSel.appendChild(o)});
- const sum=$('adSum'),grid=$('adGrid');
  const pin=$('customerPin'),city=$('customerCity'),st=$('adStatus'),near=$('adNear'),areaW=$('adAreaWrap'),area=$('customerArea');
  let seq=0,lastPin='';
  const say=(t,c)=>{st.textContent=t||'';st.className='adStatus'+(c?' '+c:'')};
@@ -258,22 +245,20 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOrderModal();})
   try{
    const d=await getJSON('https://api.postalpincode.in/pincode/'+p);if(my!==seq)return;
    const r=d&&d[0];
-   if(!r||r.Status!=='Success'||!(r.PostOffice||[]).length){pin.classList.add('bad');sum.hidden=true;grid.hidden=false;say('This PIN was not found. Please check it, or fill state and city yourself.','err');return}
+   if(!r||r.Status!=='Success'||!(r.PostOffice||[]).length){pin.classList.add('bad');say('This PIN was not found. Please check it.','err');return}
    const offices=r.PostOffice,f=offices[0],state=matchState(f.State);
    if(state)stSel.value=state;city.value=f.District||f.Block||city.value;
    area.innerHTML='';offices.forEach(o=>{const e=document.createElement('option');e.value=e.textContent=o.Name;area.appendChild(e)});
    const oth=document.createElement('option');oth.value='';oth.textContent='Other / not listed';area.appendChild(oth);
-   areaW.hidden=false;pin.classList.add('ok');say('');
-   const nm=f.Name||f.Block||f.District||'';$('adSumMain').textContent=p+' · '+(f.District||nm)+', '+(f.State||'');$('adSumSub').textContent='Delivery area confirmed. Choose your locality below, then add your house address.';
-   sum.hidden=false;if(state)grid.hidden=true;else{grid.hidden=false;say('Please choose your state and city.','err')}
+   areaW.hidden=false;pin.classList.add('ok');say('✓ Delivering to '+(f.District||'')+', '+(f.State||''),'ok');
    if(!keepNear)near.hidden=true;
    document.querySelectorAll('.adChip').forEach(c=>c.classList.toggle('on',c.dataset.pin===p));
-  }catch(e){if(my!==seq)return;sum.hidden=true;grid.hidden=false;say('Could not check the PIN right now. Please fill State and City yourself.','err')}
+  }catch(e){if(my!==seq)return;say('Could not check the PIN right now. Please fill State and City yourself.','err')}
  }
- pin.addEventListener('input',()=>{pin.value=pin.value.replace(/\D/g,'').slice(0,6);pin.classList.remove('ok','bad');if(pin.value.length===6&&pin.value!==lastPin)lookup(pin.value);else if(pin.value.length<6){areaW.hidden=true;sum.hidden=true;grid.hidden=false;lastPin='';say('')}});
+ pin.addEventListener('input',()=>{pin.value=pin.value.replace(/\D/g,'').slice(0,6);pin.classList.remove('ok','bad');if(pin.value.length===6&&pin.value!==lastPin)lookup(pin.value);else if(pin.value.length<6){areaW.hidden=true;lastPin='';say('')}});
  function chips(list){
   near.innerHTML='<p>Nearby PIN codes — tap yours</p><div class="adChips"></div>';const w=near.querySelector('.adChips');
-  list.forEach(x=>{const b=document.createElement('button');b.type='button';b.className='adChip';b.dataset.pin=x.pin;b.innerHTML='<b>'+x.pin+'</b><small>'+String(x.name).replace(/</g,'&lt;')+'</small>';b.onclick=()=>{pin.value=x.pin;lookup(x.pin,true).then(()=>{const h=$('customerHouse');if(h&&pin.classList.contains('ok')){h.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>h.focus({preventScroll:true}),350)}})};w.appendChild(b)});
+  list.forEach(x=>{const b=document.createElement('button');b.type='button';b.className='adChip';b.dataset.pin=x.pin;b.innerHTML='<b>'+x.pin+'</b><small>'+String(x.name).replace(/</g,'&lt;')+'</small>';b.onclick=()=>{pin.value=x.pin;lookup(x.pin,true)};w.appendChild(b)});
   near.hidden=false;
  }
  $('adLocBtn').addEventListener('click',()=>{
@@ -296,7 +281,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOrderModal();})
    btn.disabled=false;
   },err=>{btn.disabled=false;say(err&&err.code===1?'Location permission is off. Please type your PIN instead.':'Could not get your location. Please type your PIN.','err')},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
  });
- $('adEdit').addEventListener('click',()=>{grid.hidden=false;sum.hidden=true;stSel.focus()});
  window.buildAddress=function(){
   const h=$('customerHouse').value.trim(),l=$('customerLandmark').value.trim(),a=(area&&!areaW.hidden)?area.value:'';
   const full=[h,l?'Landmark: '+l:'',a].filter(Boolean).join(', ');$('customerAddress').value=full;return full;

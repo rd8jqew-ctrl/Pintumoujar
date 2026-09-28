@@ -225,18 +225,33 @@ async function useCurrentLocation(){
   locationBtn.disabled=true;setLocationStatus('Detecting your location…','loading');
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
-      const r=await fetch('/api/reverse-geocode?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude),{cache:'no-store'});
-      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error||'Could not detect the address');
-      const pin=String(d.pin||'').replace(/\D/g,'').slice(0,6);
-      if(pin.length!==6)throw new Error('PIN could not be detected. Please enter it manually.');
-      const addr=document.getElementById('customerAddress'); if(addr&&d.address)addr.value=String(d.address);
+      // Use a client-side GPS reverse-geocoder so the locality comes from the
+      // device coordinates directly. This is more appropriate for delivery-area
+      // detection than using the PIN's administrative district (e.g. "North West Delhi").
+      const url='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(pos.coords.latitude)+'&longitude='+encodeURIComponent(pos.coords.longitude)+'&localityLanguage=en';
+      const r=await fetch(url,{cache:'no-store'});
+      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.description||'Could not detect the address');
+      const pin=String(d.postcode||'').replace(/\D/g,'').slice(0,6);
+      const detectedLocality=String(d.locality||'').trim();
+      const detectedCity=String(d.city||'').trim()||detectedLocality;
+      const detectedState=String(d.principalSubdivision||'').trim();
+      if(pin.length!==6||!detectedState)throw new Error('A complete location could not be detected. Please enter the address manually.');
+      const addr=document.getElementById('customerAddress');
+      // Do not pretend GPS knows the house/flat number. Put only the detected
+      // locality into the address field so the customer can append the exact unit.
+      if(addr&&detectedLocality)addr.value=detectedLocality;
       const pinEl=document.getElementById('customerPin'); if(pinEl)pinEl.value=pin;
-      await lookupPinCode(true);
-      const cityEl=document.getElementById('customerCity'); const detectedCity=String(d.city||'').trim();
-      if(cityEl&&detectedCity){const opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());if(opt)cityEl.value=opt.value;}
-      const stateEl=document.getElementById('customerState'); const detectedState=String(d.state||'').trim();
+      const cityEl=document.getElementById('customerCity');
+      if(cityEl&&detectedCity){
+        const existing=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());
+        if(existing){cityEl.value=existing.value;}
+        else{cityEl.innerHTML='<option value="'+escDetail(detectedCity)+'">'+escDetail(detectedCity)+'</option>';cityEl.disabled=false;cityEl.value=detectedCity;}
+      }
+      const stateEl=document.getElementById('customerState');
       if(stateEl&&detectedState){const opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(opt)stateEl.value=opt.value;}
-      setLocationStatus('✓ Location detected. Please check your address and house / flat number before ordering.','ok');
+      pinLookup={pin,state:detectedState,cities:[detectedCity]};
+      setPinStatus('✓ GPS location: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState,'ok');
+      setLocationStatus('✓ Location detected. Add your house / flat / room number before ordering.','ok');
       refreshCheckoutStep();
     }catch(err){setLocationStatus(err.message||'Could not detect your address. Please enter it manually.','error');}
     finally{locationBtn.disabled=false;}

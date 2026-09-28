@@ -70,7 +70,7 @@ db.products=db.products.filter(p=>!localDeletedProductIds.has(String(p.id)));
 
 function hash(s){return crypto.createHash('sha256').update(String(s)).digest('hex')}
 function originFor(req){const o=req.headers.origin||'';return o&&o===('http://'+req.headers.host)?o:''}
-function send(res,status,data,type='application/json',origin=''){const h={'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN','Referrer-Policy':'strict-origin-when-cross-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.googleapis.com",'Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,PATCH,DELETE,OPTIONS'};if(origin)h['Access-Control-Allow-Origin']=origin;res.writeHead(status,h);res.end(type==='application/json'?JSON.stringify(data):data)}
+function send(res,status,data,type='application/json',origin=''){const h={'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN','Referrer-Policy':'strict-origin-when-cross-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=(self)','Content-Security-Policy':"default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.googleapis.com",'Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,PATCH,DELETE,OPTIONS'};if(origin)h['Access-Control-Allow-Origin']=origin;res.writeHead(status,h);res.end(type==='application/json'?JSON.stringify(data):data)}
 const rate=new Map();
 function limited(req,key,limit=60,windowMs=60000){const now=Date.now();const forwarded=String(req.headers['x-forwarded-for']||'').split(',')[0].trim();const ip=forwarded||req.socket.remoteAddress||'local';const k=key+'|'+ip;const arr=(rate.get(k)||[]).filter(t=>now-t<windowMs);arr.push(now);rate.set(k,arr);return arr.length>limit}
 function body(req){return new Promise((resolve,reject)=>{let b='';req.on('data',c=>{b+=c;if(b.length>45e6){req.destroy();reject(new Error('Payload too large'))}});req.on('end',()=>{try{resolve(b?JSON.parse(b):{})}catch(e){reject(e)}});req.on('error',reject)})}
@@ -214,8 +214,21 @@ async function api(req,res,p){
      const allowedCities=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
      const allowedBlocks=[...new Set(rows.map(r=>String(r?.Block||'').trim()).filter(Boolean))];
      const cityPool=allowedCities.length?allowedCities:allowedBlocks;
+     // Some PIN services return an administrative district instead of the actual
+     // city name. Accept the standard city name for the UTs where the city and
+     // territory share the same name (notably Delhi), while still validating the PIN.
+     const stateCityAliases={
+       'delhi':['delhi'],
+       'chandigarh':['chandigarh'],
+       'puducherry':['puducherry'],
+       'lakshadweep':['kavaratti'],
+       'ladakh':['leh','kargil']
+     };
+     const normalizedStateForCity=stateKey(detectedState);
+     const cityAliases=stateCityAliases[normalizedStateForCity]||[];
+     const expandedCityPool=[...new Set([...cityPool,...cityAliases])];
      const cityKey=v=>normalizeState(v);
-     if(!cityPool.some(v=>cityKey(v)===cityKey(customerCity)))return send(res,400,{error:'The selected City does not match the PIN code. Please use the detected City.'},'application/json',origin);
+     if(!expandedCityPool.some(v=>cityKey(v)===cityKey(customerCity)))return send(res,400,{error:'The selected City does not match the PIN code. Please use the detected City.'},'application/json',origin);
    }catch(e){return send(res,503,{error:'PIN verification is temporarily unavailable. Please try again.'},'application/json',origin)}
    const sellerState=String(db.settings.sellerState||'').trim();
    // Seller state is needed to split GST into CGST/SGST vs IGST, but it must not

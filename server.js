@@ -162,6 +162,7 @@ async function api(req,res,p){
    }
    const customerState=String(x.state||x.customerState||'').trim();
    const sellerState=String(db.settings.sellerState||'').trim();
+   if(!sellerState&&Number(db.settings.gst||5)>0)return send(res,400,{error:'Seller / business State must be configured in GST settings before placing taxable orders'},'application/json',origin);
    const gstInclusive=x.gstInclusive!==false && x.gstIncluded!==false;
    const discountFactor=subtotal>0?Math.max(0,1-(discount/subtotal)):0;
    let gst=0,taxableSubtotal=0;

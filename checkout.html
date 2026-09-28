@@ -92,7 +92,7 @@
         <input type="hidden" id="customerAddress">
       </section>
       <h3>Payment method</h3>
-      <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
+      <label id="payOnlineLabel" style="display:none"><input type="radio" name="pay" value="razorpay"> Pay online (UPI / Card / Netbanking)</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
       <small id="upiNote" style="display:none;color:#888;line-height:1.6">UPI option is enabled. Online gateway connection will be added later.</small>
       <p class="trustRow"><span>🔒 Secure checkout</span><span>↩ 7-day returns</span><span>🚚 Ships in 1–3 days</span></p>
@@ -186,7 +186,7 @@ let discount=0,appliedCoupon=''; let total=subtotal+shipping;
 async function initCheckout(){
   try{
     const [sr,pr]=await Promise.all([fetch('/api/site-config',{cache:'no-store'}),fetch('/api/products',{cache:'no-store'})]);
-    if(sr.ok){const d=await sr.json();const st=d.settings||{};checkoutSettings.shipping=Math.max(0,Number(st.shipping??checkoutSettings.shipping));checkoutSettings.freeShipping=Math.max(0,Number(st.freeShipping??checkoutSettings.freeShipping));}
+    if(sr.ok){const d=await sr.json();const st=d.settings||{};if(d.onlinePayment){const pl=document.getElementById('payOnlineLabel');if(pl)pl.style.display='';}checkoutSettings.shipping=Math.max(0,Number(st.shipping??checkoutSettings.shipping));checkoutSettings.freeShipping=Math.max(0,Number(st.freeShipping??checkoutSettings.freeShipping));}
     if(pr.ok){const d=await pr.json();const byId=new Map((d.products||[]).map(p=>[String(p.id),p]));cart.forEach(p=>{const id=p[8];const fresh=id&&byId.get(String(id));if(fresh){p[1]=fresh.price??p[1];p[2]=fresh.image||p[2];p[8]=fresh.id;p[9]=fresh.colors||p[9];}});}
   }catch(_){}
   subtotal=cart.reduce((sum,p)=>sum+priceOf(p)*Number(p.qty||1),0);
@@ -237,11 +237,38 @@ async function placeOrder(e){
  const btn=form.querySelector('button[type="submit"]'); if(btn)btn.disabled=true;
  try{const headers={'Content-Type':'application/json'}; if(customerToken)headers.Authorization='Bearer '+customerToken;
   const r=await fetch('/api/orders',{method:'POST',headers,body:JSON.stringify(purchase)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not place order');
+  if(d.payment==='razorpay'){await payOnline(d,purchase);return}
+  finishOrder(d,purchase);
+ }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
+}
+
+function finishOrder(d,purchase){
   const finalTotal=Number.isFinite(Number(d.total))?Number(d.total):total;
   purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal;
   localStorage.setItem('yourTypeLastPurchase',JSON.stringify(purchase));localStorage.setItem('yourTypeLastOrder',JSON.stringify(purchase));localStorage.removeItem('yourTypeCart');
   document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
- }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
+}
+
+function loadRazorpay(){return new Promise((resolve,reject)=>{if(window.Razorpay)return resolve();const s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.onload=resolve;s.onerror=()=>reject(new Error('Could not load the payment window. Please check your internet and try again.'));document.head.appendChild(s)})}
+async function postJSON(url,payload){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Payment error');return j}
+async function payOnline(d,purchase){
+  let paying=false;
+  try{
+    await loadRazorpay();
+    const o=await postJSON('/api/payments/razorpay/order',{orderId:d.orderId});
+    await new Promise((resolve,reject)=>{
+      const rz=new Razorpay({key:o.keyId,amount:o.amount,currency:o.currency,order_id:o.rzpOrderId,name:'YOUR TYPE',description:'Order '+d.orderId,
+        prefill:{name:purchase.name,email:purchase.email,contact:purchase.phone},theme:{color:'#111111'},
+        handler:async resp=>{paying=true;try{await postJSON('/api/payments/razorpay/verify',{orderId:d.orderId,razorpay_order_id:resp.razorpay_order_id,razorpay_payment_id:resp.razorpay_payment_id,razorpay_signature:resp.razorpay_signature});resolve()}catch(e){reject(e)}},
+        modal:{ondismiss:()=>{if(!paying)reject(new Error('DISMISSED'))}}});
+      rz.open();
+    });
+    finishOrder(d,purchase);
+  }catch(err){
+    if(err.message==='DISMISSED'){try{await postJSON('/api/payments/razorpay/cancel',{orderId:d.orderId})}catch(_){}alert('Payment was cancelled, so the order was not placed. Your cart is safe - you can try again.')}
+    else if(paying){alert('We could not confirm your payment yet. If money was deducted, your order will be confirmed automatically. Order number: '+d.orderId)}
+    else{try{await postJSON('/api/payments/razorpay/cancel',{orderId:d.orderId})}catch(_){}alert(err.message)}
+  }
 }
 
 function showOrderDetails(){

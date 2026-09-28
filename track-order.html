@@ -1,3 +1,23 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Track Order — YOUR TYPE</title><link rel="stylesheet" href="legal.css"><link rel="stylesheet" href="/music-player.css">
-</head><body><div class="page"><div class="top"><a class="logo" href="index.html">YOUR TYPE</a><a class="back" href="index.html">← SHOP</a></div><div class="eyebrow">YOUR TYPE / INFORMATION</div><h1>Track Order</h1><p class="muted">Enter your order number to see the current status.</p><form onsubmit="event.preventDefault();track()"><input id="id" required placeholder="YT-..." style="padding:13px;width:100%;background:#111;border:1px solid #333;color:#fff"><button style="margin-top:10px;padding:13px 18px" type="submit">TRACK ORDER</button></form><div id="result" class="note" hidden></div><script>async function track(){const id=document.getElementById("id").value.trim();const r=await fetch("/api/orders/"+encodeURIComponent(id));const d=await r.json();const e=document.getElementById("result");e.hidden=false;e.textContent=r.ok?(d.orderId+" — "+d.status+" — ₹"+Number(d.total||0).toLocaleString("en-IN")):(d.error||"Order not found")}</script><footer>© 2026 YOUR TYPE · Store information — verify final business/legal details before launch.</footer></div><script src="/music-player.js" defer></script>
+</head><body><div class="page"><div class="top"><a class="logo" href="index.html">YOUR TYPE</a><a class="back" href="index.html">← SHOP</a></div><div class="eyebrow">YOUR TYPE / INFORMATION</div><h1>Track Order</h1><p class="muted">Enter your order number to see the current status.</p><form onsubmit="event.preventDefault();track()"><input id="id" required placeholder="YT-... (order number or AWB)" style="padding:13px;width:100%;background:#111;border:1px solid #333;color:#fff"><button style="margin-top:10px;padding:13px 18px" type="submit">TRACK ORDER</button></form><div id="result" class="note" hidden></div><script>
+async function track(){
+  const id=document.getElementById("id").value.trim();
+  const e=document.getElementById("result");
+  e.hidden=false;e.textContent="Checking...";
+  try{
+    const r=await fetch("/api/orders/"+encodeURIComponent(id));
+    const d=await r.json();
+    if(!r.ok){e.textContent=d.error||"Order not found";return}
+    e.textContent="";
+    const line=(txt)=>{const p=document.createElement("div");p.textContent=txt;p.style.margin="4px 0";e.appendChild(p);return p};
+    line(d.orderId+" \u2014 "+d.status+" \u2014 \u20B9"+Number(d.total||0).toLocaleString("en-IN"));
+    if(d.awb){
+      line("Courier: "+(d.courier||"\u2014"));
+      line("AWB / Tracking number: "+d.awb);
+      if(d.trackingUrl&&/^https?:\/\//i.test(d.trackingUrl)){const p=document.createElement("div");p.style.margin="8px 0 0";const a=document.createElement("a");a.href=d.trackingUrl;a.target="_blank";a.rel="noopener";a.textContent="Track on courier website \u2192";a.style.color="#fff";p.appendChild(a);e.appendChild(p)}
+    }else if(!/Cancelled|Awaiting/.test(d.status)){line("Tracking number will appear here once your order is packed.")}
+  }catch(_){e.textContent="Could not check right now. Please try again."}
+}
+(function(){const q=new URLSearchParams(location.search).get("id");if(q){document.getElementById("id").value=q;track()}})();
+</script><footer>© 2026 YOUR TYPE · Store information — verify final business/legal details before launch.</footer></div><script src="/music-player.js" defer></script>
 </body></html>

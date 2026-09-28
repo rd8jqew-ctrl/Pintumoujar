@@ -14,6 +14,16 @@ const ADMIN_AUTH_FILE=path.join(ROOT,'admin-auth.json');
 const ADMIN_USER=process.env.ADMIN_USER||'admin';
 const ADMIN_PASS=process.env.ADMIN_PASS||'';
 const ADMIN_RESET_TOKEN=process.env.ADMIN_RESET_TOKEN||'';
+// --- Order automation config (all secrets come from environment variables, never from code) ---
+const TEST_MODE=String(process.env.TEST_MODE||'true').toLowerCase()!=='false'; // true = fake TEST AWB is auto-created; set TEST_MODE=false when Shiprocket is connected
+const RZP_KEY_ID=process.env.RAZORPAY_KEY_ID||'';
+const RZP_KEY_SECRET=process.env.RAZORPAY_KEY_SECRET||'';
+const RZP_WEBHOOK_SECRET=process.env.RAZORPAY_WEBHOOK_SECRET||'';
+const RZP_API=(process.env.RAZORPAY_API_BASE||'https://api.razorpay.com/v1').replace(/\/+$/,'');
+const RESEND_API_KEY=process.env.RESEND_API_KEY||'';
+const BREVO_API_KEY=process.env.BREVO_API_KEY||'';
+const MAIL_FROM=process.env.MAIL_FROM||'';
+const AWAITING='Awaiting Payment';
 const YOUTUBE_API_KEY=process.env.YOUTUBE_API_KEY||'';
 const STATUSES=['New','Processing','Confirmed','Packed','Shipped','Out for Delivery','Delivered','Cancelled'];
 const SIZES=['S','M','L','XL','XXL'];
@@ -119,6 +129,72 @@ async function enrichYouTubeMusic(videoId,x){
 }
 
 
+// ===== Order automation helpers: auto AWB, Razorpay, email =====
+function trackingLinkFor(courier,awb){const a=encodeURIComponent(awb||''),c=String(courier||'').toLowerCase();if(!awb)return '';if(c==='delhivery')return 'https://www.delhivery.com/track/package/'+a;if(c==='shiprocket')return 'https://shiprocket.co/tracking/'+a;return ''}
+// Creates an AWB automatically once an order is Packed (or later). In TEST_MODE this is a fake AWB.
+// When Shiprocket is connected, replace the TEST block with a Shiprocket API call that returns a real AWB.
+function ensureAwb(o){
+  if(o.awb||!['Packed','Shipped','Out for Delivery','Delivered'].includes(o.status))return false;
+  if(!TEST_MODE)return false;
+  o.awb='TEST'+String(crypto.randomInt(0,1e9)).padStart(9,'0');
+  if(!o.courier)o.courier='Delhivery';
+  if(!o.tracking_url)o.tracking_url=trackingLinkFor(o.courier,o.awb);
+  audit('awb.auto',{orderId:o.orderId,awb:o.awb,test:true});
+  return true;
+}
+function safeEq(a,b){const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&crypto.timingSafeEqual(x,y)}
+function rawBody(req){return new Promise((resolve,reject)=>{const chunks=[];let n=0;req.on('data',c=>{n+=c.length;if(n>1e6){req.destroy();reject(new Error('Payload too large'));return}chunks.push(c)});req.on('end',()=>resolve(Buffer.concat(chunks)));req.on('error',reject)})}
+function rzpAuth(){return 'Basic '+Buffer.from(RZP_KEY_ID+':'+RZP_KEY_SECRET).toString('base64')}
+async function rzpApi(method,pathname,payload){
+  const r=await fetch(RZP_API+pathname,{method,headers:{'Content-Type':'application/json',Authorization:rzpAuth()},body:payload?JSON.stringify(payload):undefined});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error((d.error&&d.error.description)||'Razorpay error');
+  return d;
+}
+function amountPaise(o){return Math.round(Number(o.total||0)*100)}
+function reserveStock(o){
+  for(const it of o.items||[]){const pr=db.products.find(v=>v.id===it.productId);if(!pr||Number(pr.sizes?.[it.size]||0)<it.qty)return false}
+  for(const it of o.items||[]){const pr=db.products.find(v=>v.id===it.productId);pr.sizes[it.size]=Number(pr.sizes[it.size]||0)-it.qty}
+  return true;
+}
+function releaseStock(o){for(const it of o.items||[]){const pr=db.products.find(v=>v.id===it.productId);if(pr){pr.sizes ||= {};pr.sizes[it.size]=Number(pr.sizes[it.size]||0)+Number(it.qty||0)}}}
+async function markPaid(o,paymentId,via){
+  if(o.payment!=='razorpay')return false;
+  if(o.status!==AWAITING&&o.status!=='Cancelled')return true; // already paid earlier (verify + webhook both arrive)
+  if(o.status==='Cancelled'&&!reserveStock(o)){audit('payment.received.on.cancelled.order',{orderId:o.orderId,paymentId});await saveAndFlush(db);return false}
+  o.status='New';o.paymentId=paymentId||'';o.paidAt=new Date().toISOString();
+  audit('payment.captured',{orderId:o.orderId,paymentId,via});
+  await saveAndFlush(db);
+  sendOrderEmail(o);
+  return true;
+}
+// Unpaid online orders are released after 30 minutes so stock is not blocked forever.
+setInterval(()=>{let changed=false;const now=Date.now();for(const o of db.orders){if(o.payment==='razorpay'&&o.status===AWAITING&&now-new Date(o.date).getTime()>30*60*1000){o.status='Cancelled';releaseStock(o);audit('order.payment.expired',{orderId:o.orderId});changed=true}}if(changed)save(db)},5*60*1000).unref();
+async function sendOrderEmail(o){
+  try{
+    const key=RESEND_API_KEY||BREVO_API_KEY;
+    if(!o.email||!key){console.log('[mail] skipped for '+o.orderId+' (no email provider key or customer email)');return}
+    const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const money=n=>'\u20B9'+Number(n||0).toLocaleString('en-IN');
+    const link=SITE_URL+'/track-order.html?id='+encodeURIComponent(o.orderId);
+    const rows=(o.items||[]).map(i=>'<tr><td style="padding:6px 0">'+E(i.name)+' <span style="color:#777">(Size '+E(i.size)+', '+E(i.color)+') x '+Number(i.qty||1)+'</span></td><td style="padding:6px 0;text-align:right">'+money(priceNumber(i.price)*Number(i.qty||1))+'</td></tr>').join('');
+    const payLine=o.payment==='cod'?'Cash on Delivery - please keep '+money(o.total)+' ready.':'Paid online.';
+    const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#111"><h2>Thank you, '+E(o.name)+'!</h2><p>Your order <b>'+E(o.orderId)+'</b> is confirmed.</p><table style="width:100%;border-collapse:collapse">'+rows+'<tr><td style="padding:10px 0;border-top:1px solid #ddd"><b>Total</b></td><td style="padding:10px 0;border-top:1px solid #ddd;text-align:right"><b>'+money(o.total)+'</b></td></tr></table><p>'+E(payLine)+'</p><p><a href="'+E(link)+'" style="display:inline-block;padding:12px 18px;background:#111;color:#fff;text-decoration:none">Track your order</a></p><p style="color:#777;font-size:12px">Delivering to: '+E(o.address)+', '+E([o.city,o.state].filter(Boolean).join(', '))+' - '+E(o.pin)+'</p></div>';
+    const subject='Order confirmed - '+o.orderId;
+    let r;
+    if(RESEND_API_KEY){
+      r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+RESEND_API_KEY},body:JSON.stringify({from:MAIL_FROM||'YOUR TYPE <onboarding@resend.dev>',to:[o.email],subject,html})});
+    }else{
+      const m=/^(.*)<(.+)>$/.exec(MAIL_FROM.trim()),sender=m?{name:m[1].trim().replace(/^"|"$/g,'')||'YOUR TYPE',email:m[2].trim()}:{name:'YOUR TYPE',email:MAIL_FROM.trim()};
+      if(!sender.email){audit('email.failed',{orderId:o.orderId,error:'MAIL_FROM is required for Brevo'});return}
+      r=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',headers:{'Content-Type':'application/json','api-key':BREVO_API_KEY},body:JSON.stringify({sender,to:[{email:o.email,name:o.name}],subject,htmlContent:html})});
+    }
+    if(r.ok){audit('email.sent',{orderId:o.orderId})}else{const t=await r.text().catch(()=>'');audit('email.failed',{orderId:o.orderId,error:t.slice(0,200)});console.warn('[mail] failed',r.status,t.slice(0,200))}
+    save(db);
+  }catch(e){console.warn('[mail] error:',e.message);try{audit('email.failed',{orderId:o.orderId,error:String(e.message).slice(0,200)})}catch{}}
+}
+
+
 async function api(req,res,p){
  const origin=originFor(req);
  try{
@@ -137,7 +213,7 @@ async function api(req,res,p){
   if(req.method==='GET'&&p==='/api/auth/me'){const s=auth(req,'customer');if(!s)return send(res,401,{error:'Unauthorized'},'application/json',origin);const u=db.users.find(v=>v.id===s.userId);if(!u)return send(res,404,{error:'Account not found'},'application/json',origin);return send(res,200,{id:u.id,name:u.name,email:u.email},'application/json',origin)}
   if(req.method==='GET'&&p==='/api/auth/orders'){const s=auth(req,'customer');if(!s)return send(res,401,{error:'Unauthorized'},'application/json',origin);return send(res,200,{orders:db.orders.filter(o=>o.userId===s.userId).map(o=>({orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items}))},'application/json',origin)}
   if(req.method==='POST'&&p==='/api/newsletter'){const x=await body(req),email=String(x.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return send(res,400,{error:'Invalid email'},'application/json',origin);if(!db.newsletter.some(v=>v.email===email))db.newsletter.push({email,createdAt:new Date().toISOString()});save(db);return send(res,201,{ok:true},'application/json',origin)}
-  if(req.method==='GET'&&p==='/api/site-config')return send(res,200,{site:db.site,settings:{gst:Number(db.settings.gst||0),shipping:Number(db.settings.shipping||0),freeShipping:Number(db.settings.freeShipping||0)}},'application/json',origin);
+  if(req.method==='GET'&&p==='/api/site-config')return send(res,200,{onlinePayment:Boolean(RZP_KEY_ID&&RZP_KEY_SECRET),site:db.site,settings:{gst:Number(db.settings.gst||0),shipping:Number(db.settings.shipping||0),freeShipping:Number(db.settings.freeShipping||0)}},'application/json',origin);
   if(req.method==='PATCH'&&p==='/api/admin/site-config'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);if(x.hero!==undefined)db.site.hero=String(x.hero);if(x.announcement!==undefined)db.site.announcement=String(x.announcement);if(x.sections&&typeof x.sections==='object')db.site.sections=x.sections;if(x.sectionProducts&&typeof x.sectionProducts==='object'){const incoming={};Object.entries(x.sectionProducts).forEach(([section,ids])=>{if(!Array.isArray(ids))return;incoming[String(section)]=[...new Set(ids.map(v=>String(v)).filter(id=>db.products.some(prod=>String(prod.id)===id)))];});const current=db.site.sectionProducts&&typeof db.site.sectionProducts==='object'?db.site.sectionProducts:{};const merged={...current,...incoming};const touchedIds=new Set(Object.values(incoming).flat());Object.keys(merged).forEach(section=>{if(incoming[section]===undefined)return;merged[section]=incoming[section];});Object.keys(merged).forEach(section=>{if(!Array.isArray(merged[section]))merged[section]=[];merged[section]=[...new Set(merged[section].map(v=>String(v)).filter(id=>db.products.some(prod=>String(prod.id)===id)))];});if(touchedIds.size){Object.keys(merged).forEach(section=>{if(incoming[section]!==undefined)return;merged[section]=merged[section].filter(id=>!touchedIds.has(String(id)));});}db.site.sectionProducts=merged}if(Array.isArray(x.colorPalette))db.site.colorPalette=x.colorPalette.map(v=>String(v).trim()).filter(Boolean);audit('site.update');await saveAndFlush(db);return send(res,200,{ok:true,site:db.site},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/products')return send(res,200,{products:db.products.filter(p=>p.active!==false).map(safeProduct)},'application/json',origin);
@@ -146,6 +222,8 @@ async function api(req,res,p){
 
   if(req.method==='POST'&&p==='/api/orders'){
    const x=await body(req);if(!x.name||!x.email||!x.phone||!x.address||!x.pin||!Array.isArray(x.items)||!x.items.length||!/^\d{6}$/.test(String(x.pin)))return send(res,400,{error:'Complete shipping details and cart are required'},'application/json',origin);
+   let payMethod=String(x.payment||'cod').toLowerCase();if(payMethod==='upi')payMethod='razorpay';if(!['cod','razorpay'].includes(payMethod))payMethod='cod';
+   if(payMethod==='razorpay'&&!(RZP_KEY_ID&&RZP_KEY_SECRET))return send(res,503,{error:'Online payment is not available right now. Please choose Cash on Delivery.'},'application/json',origin);
    const requested=[],reserved=new Map();
    for(const item of x.items){const pr=findProduct(item);if(!pr||pr.active===false)return send(res,400,{error:'Product no longer available: '+String(item.name||item.productId||'')},'application/json',origin);const size=SIZES.includes(String(item.size))?String(item.size):'M';const qty=Math.min(99,Math.max(1,Math.floor(Number(item.qty||1))));const key=pr.id+'|'+size;const already=reserved.get(key)||0;const available=Number(pr.sizes?.[size]||0)-already;if(available<qty)return send(res,409,{error:`${pr.name} size ${size} is out of stock`},'application/json',origin);reserved.set(key,already+qty);requested.push({productId:pr.id,name:pr.name,image:pr.image,sku:pr.sku||'',price:pr.price,size,color:String(item.color||'Black'),qty});}
    for(const [key,qty] of reserved){const [id,size]=key.split('|');const pr=db.products.find(v=>v.id===id);pr.sizes[size]=Math.max(0,Number(pr.sizes[size]||0)-qty)}
@@ -166,10 +244,51 @@ async function api(req,res,p){
    // Prices are treated as GST-inclusive, so GST is extracted for reporting and does not change the customer-facing total.
    const gst=gstRate>0?Math.round(taxableSubtotal*gstRate/(100+gstRate)):0;
    const total=taxableSubtotal+shipping;
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:String(x.state||'').trim().slice(0,60),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:''};
-   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total},'application/json',origin);
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:String(x.state||'').trim().slice(0,60),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:payMethod,orderId:id,status:payMethod==='razorpay'?AWAITING:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:''};
+   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);if(payMethod==='cod')sendOrderEmail(order);return send(res,201,{orderId:id,total,payment:payMethod},'application/json',origin);
   }
-  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items},'application/json',origin)}
+  if(req.method==='POST'&&p==='/api/payments/razorpay/order'){
+    if(!(RZP_KEY_ID&&RZP_KEY_SECRET))return send(res,503,{error:'Online payment is not available right now.'},'application/json',origin);
+    const x=await body(req),o=db.orders.find(v=>v.orderId===String(x.orderId||''));
+    if(!o||o.payment!=='razorpay'||o.status!==AWAITING)return send(res,400,{error:'This order is not waiting for payment'},'application/json',origin);
+    try{const ro=await rzpApi('POST','/orders',{amount:amountPaise(o),currency:'INR',receipt:o.orderId,notes:{orderId:o.orderId}});o.rzpOrderId=ro.id;save(db);
+      return send(res,200,{keyId:RZP_KEY_ID,rzpOrderId:ro.id,amount:ro.amount,currency:ro.currency},'application/json',origin)}
+    catch(e){console.warn('[razorpay] order create failed:',e.message);return send(res,502,{error:'Could not start payment. Please try again.'},'application/json',origin)}
+  }
+  if(req.method==='POST'&&p==='/api/payments/razorpay/verify'){
+    const x=await body(req),o=db.orders.find(v=>v.orderId===String(x.orderId||''));
+    const rid=String(x.razorpay_order_id||''),pid=String(x.razorpay_payment_id||''),sig=String(x.razorpay_signature||'');
+    if(!o||o.payment!=='razorpay'||!rid||!pid||!sig)return send(res,400,{error:'Invalid payment details'},'application/json',origin);
+    const expected=crypto.createHmac('sha256',RZP_KEY_SECRET).update(rid+'|'+pid).digest('hex');
+    if(!safeEq(expected,sig)){audit('payment.signature.invalid',{orderId:o.orderId});save(db);return send(res,400,{error:'Payment could not be verified'},'application/json',origin)}
+    try{const ro=await rzpApi('GET','/orders/'+encodeURIComponent(rid));if(ro.receipt!==o.orderId||Number(ro.amount)!==amountPaise(o))return send(res,400,{error:'Payment does not match this order'},'application/json',origin)}
+    catch(e){return send(res,502,{error:'Could not confirm payment right now. If money was deducted your order will be confirmed automatically.'},'application/json',origin)}
+    const ok=await markPaid(o,pid,'verify');
+    if(!ok)return send(res,409,{error:'Payment received but the item just went out of stock. We will refund you.'},'application/json',origin);
+    return send(res,200,{ok:true,orderId:o.orderId},'application/json',origin);
+  }
+  if(req.method==='POST'&&p==='/api/payments/razorpay/cancel'){
+    const x=await body(req),o=db.orders.find(v=>v.orderId===String(x.orderId||''));
+    if(o&&o.payment==='razorpay'&&o.status===AWAITING){o.status='Cancelled';releaseStock(o);audit('order.payment.cancelled',{orderId:o.orderId});save(db)}
+    return send(res,200,{ok:true},'application/json',origin);
+  }
+  if(req.method==='POST'&&p==='/api/payments/razorpay/webhook'){
+    if(!RZP_WEBHOOK_SECRET)return send(res,503,{error:'Webhook not configured'},'application/json',origin);
+    const raw=await rawBody(req),sig=String(req.headers['x-razorpay-signature']||'');
+    const expected=crypto.createHmac('sha256',RZP_WEBHOOK_SECRET).update(raw).digest('hex');
+    if(!safeEq(expected,sig))return send(res,400,{error:'Invalid signature'},'application/json',origin);
+    let ev;try{ev=JSON.parse(raw.toString('utf8'))}catch{return send(res,400,{error:'Bad payload'},'application/json',origin)}
+    const pay=ev.payload?.payment?.entity||{},ord=ev.payload?.order?.entity||{};
+    if(ev.event==='payment.captured'||ev.event==='order.paid'){
+      const rzpOrder=ord.id||pay.order_id||'',receipt=ord.receipt||pay.notes?.orderId||'';
+      const o=db.orders.find(v=>v.orderId===receipt)||db.orders.find(v=>rzpOrder&&v.rzpOrderId===rzpOrder);
+      const paid=Number(pay.amount||ord.amount_paid||0);
+      if(o&&o.payment==='razorpay'&&paid===amountPaise(o)){await markPaid(o,pay.id||'','webhook')}
+      else audit('webhook.unmatched',{event:ev.event,receipt,paid});
+    }else if(ev.event==='payment.failed'){audit('payment.failed',{orderId:pay.notes?.orderId||'',reason:String(pay.error_description||'').slice(0,120)})}
+    save(db);return send(res,200,{ok:true},'application/json',origin);
+  }
+  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)).trim(),key=id.toUpperCase(),o=db.orders.find(v=>v.orderId===id||String(v.orderId).toUpperCase()===key||(v.awb&&String(v.awb).toUpperCase()===key));if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items,payment:o.payment,awb:o.awb||'',courier:o.courier||'',trackingUrl:o.tracking_url||trackingLinkFor(o.courier,o.awb)},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/music/current'){
     const m=db.music||{};
@@ -227,7 +346,7 @@ async function api(req,res,p){
     for(const id of (Array.isArray(x.ids)?x.ids:[]).slice(0,200).map(String)){if(!db.orders.some(v=>v.orderId===id))continue;const cur=db.slip.orders[id]||(db.slip.orders[id]={});cur[f]=Math.min(1e6,(cur[f]||0)+1);out[id]={slipPrints:cur.slipPrints||0,labelPrints:cur.labelPrints||0}}
     await saveAndFlush(db);return send(res,200,{ok:true,counts:out},'application/json',origin);
   }
-  if(req.method==='PATCH'&&p.startsWith('/api/admin/orders/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/orders/'.length)),x=await body(req),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);if(x.status!==undefined&&!STATUSES.includes(x.status))return send(res,400,{error:'Invalid order status'},'application/json',origin);for(const k of ['status','awb','courier','tracking_url','verified'])if(x[k]!==undefined)o[k]=x[k];applySlipOptions(id,x);audit('order.update',{orderId:id,fields:Object.keys(x)});await saveAndFlush(db);return send(res,200,{...o,...(db.slip.orders[id]||{})},'application/json',origin)}
+  if(req.method==='PATCH'&&p.startsWith('/api/admin/orders/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/orders/'.length)),x=await body(req),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);if(x.status!==undefined&&!STATUSES.includes(x.status))return send(res,400,{error:'Invalid order status'},'application/json',origin);if(o.status===AWAITING&&x.status!==undefined&&x.status!=='Cancelled')return send(res,400,{error:'This order is still waiting for online payment'},'application/json',origin);for(const k of ['status','awb','courier','tracking_url','verified'])if(x[k]!==undefined)o[k]=x[k];ensureAwb(o);applySlipOptions(id,x);audit('order.update',{orderId:id,fields:Object.keys(x)});await saveAndFlush(db);return send(res,200,{...o,...(db.slip.orders[id]||{})},'application/json',origin)}
   if(req.method==='DELETE'&&p.startsWith('/api/admin/orders/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/orders/'.length)),i=db.orders.findIndex(v=>v.orderId===id);if(i<0)return send(res,404,{error:'Order not found'},'application/json',origin);db.orders.splice(i,1);delete db.slip.orders[id];audit('order.delete',{orderId:id});await saveAndFlush(db);return send(res,200,{ok:true},'application/json',origin)}
 
   if(req.method==='PATCH'&&p.startsWith('/api/admin/reviews/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/reviews/'.length)),x=await body(req),r=db.reviews.find(v=>v.id===id);if(!r)return send(res,404,{error:'Review not found'},'application/json',origin);if(x.status!==undefined&&['pending','approved','rejected'].includes(x.status))r.status=x.status;if(x.reply!==undefined)r.reply=String(x.reply);audit('review.update',{id});await saveAndFlush(db);return send(res,200,r,'application/json',origin)}

@@ -1,0 +1,27 @@
+YOUR TYPE - Order automation setup (Render Environment Variables)
+=================================================================
+Render dashboard -> apna service -> Environment -> neeche ke variables add karo, phir Save (auto redeploy hoga).
+
+SITE_URL                 = apni Render site ka poora link, jaise https://your-type-xxxx.onrender.com  (email ke tracking link isi se bante hain)
+TEST_MODE                = true   (abhi testing: order Packed hote hi nakli AWB TEST123456789 ban jata hai)
+                                   Launch par Shiprocket jodne ke baad false karna.
+
+RAZORPAY_KEY_ID          = rzp_test_...   (Razorpay dashboard, Test Mode ON -> Settings -> API Keys)
+RAZORPAY_KEY_SECRET      = (wahi page ka secret)
+RAZORPAY_WEBHOOK_SECRET  = koi bhi lamba random text, jo aap webhook banate waqt Razorpay mein bhi daaloge
+
+RESEND_API_KEY           = re_...   (resend.com free account -> API Keys)
+MAIL_FROM                = (optional) YOUR TYPE <onboarding@resend.dev>
+                           Bina domain verify kiye Resend sirf aapke apne signup email par mail bhejta hai.
+                           (Brevo use karna ho toh RESEND_API_KEY ki jagah BREVO_API_KEY daalo aur MAIL_FROM me
+                           Brevo mein verified sender email daalo.)
+
+Razorpay webhook (Test Mode ON rakhkar): Settings -> Webhooks -> Add
+  URL    : SITE_URL + /api/payments/razorpay/webhook
+  Secret : wahi RAZORPAY_WEBHOOK_SECRET
+  Events : payment.captured, order.paid, payment.failed
+
+Test card : 4111 1111 1111 1111, koi bhi aage ki expiry, koi bhi CVV
+Test UPI  : success@razorpay (pass), failure@razorpay (fail)
+
+Launch se pehle: rzp_test keys ki jagah rzp_live keys, webhook live mode me bhi banao, aur real AWB ke liye Shiprocket jodo.

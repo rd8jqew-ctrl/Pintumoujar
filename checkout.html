@@ -384,33 +384,68 @@ async function viewOrderDetails(){
 }
 async function downloadCustomerInvoice(){
   let o=null;
-  try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(_){}
+  try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(_){ }
   const id=o?.orderId||document.getElementById('doneOrderId')?.textContent||'';
   if(!id){alert('Order ID not found.');return;}
-  try{
-    const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});
-    if(r.ok)o=await r.json();
-  }catch(_){}
+  try{const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});if(r.ok)o=await r.json()}catch(_){ }
   if(!o){alert('Invoice details are temporarily unavailable. Please try again.');return;}
+
   const load=(src,test)=>test()?Promise.resolve(true):new Promise(resolve=>{const sc=document.createElement('script');sc.src=src;sc.onload=()=>resolve(true);sc.onerror=()=>resolve(false);document.head.appendChild(sc)});
   const ok=await load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf?.jsPDF);
   if(!ok){
     const w=window.open('','_blank','noopener,noreferrer');
     if(!w){alert('Please allow pop-ups to print/download your invoice.');return;}
-    const rows=(o.items||[]).map(i=>'<tr><td>'+escDetail(i.name||'Product')+'</td><td>'+escDetail(i.size||'—')+'</td><td>'+escDetail(i.color||'—')+'</td><td>'+Number(i.qty||1)+'</td><td>'+moneyDetail(Number(i.price||0)*Number(i.qty||1))+'</td></tr>').join('');
-    w.document.write('<!doctype html><title>YOUR TYPE Invoice '+escDetail(id)+'</title><style>body{font-family:Arial;padding:30px;color:#111}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}h1{letter-spacing:2px} .r{text-align:right}</style><h1>YOUR TYPE</h1><h2>ORDER INVOICE</h2><p>Order: '+escDetail(id)+'<br>Payment: '+escDetail(String(o.payment||'COD').toUpperCase())+'<br>Status: '+escDetail(o.status||'Confirmed')+'</p><table><thead><tr><th>Product</th><th>Size</th><th>Color</th><th>Qty</th><th>Total</th></tr></thead><tbody>'+rows+'</tbody></table><p class="r">Subtotal: '+moneyDetail(o.subtotal)+'<br>Discount: '+moneyDetail(o.discount)+'<br>Shipping: '+moneyDetail(o.shipping)+'<br>Taxable: '+moneyDetail(o.taxableSubtotal)+'<br>GST: '+moneyDetail(o.gst)+'<br><b>Total: '+moneyDetail(o.total)+'</b></p><h3>Shipping Address</h3><p>'+escDetail([o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('\n'))+'</p><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>');w.document.close();return;
+    const items=(o.items||[]).map(i=>'<tr><td><b>'+escDetail(i.name||'Product')+'</b><small>'+escDetail(i.sku?'SKU '+i.sku:'')+(i.size?' · Size '+i.size:'')+(i.color?' · '+i.color:'')+'</small></td><td>'+Number(i.qty||1)+'</td><td class="amt">'+moneyDetail(Number(i.price||0)*Number(i.qty||1))+'</td></tr>').join('');
+    const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('<br>');
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>YOUR TYPE Invoice '+escDetail(id)+'</title><style>*{box-sizing:border-box}body{margin:0;background:#f3f3f3;font-family:Arial,sans-serif;color:#151515}.page{width:794px;min-height:1123px;margin:0 auto;background:#fff;padding:42px 46px}.head{background:#111;color:#fff;padding:28px 30px;margin:-42px -46px 30px;display:flex;justify-content:space-between}.brand{font-size:24px;font-weight:800;letter-spacing:3px}.inv{font-size:12px;letter-spacing:2px}.meta{display:flex;justify-content:space-between;color:#666;font-size:11px;margin-bottom:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px}.card{border:1px solid #e7e7e7;border-radius:10px;padding:15px}.label{font-size:9px;color:#888;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px}.value{font-size:12px;line-height:1.55}.status{display:inline-block;border:1px solid #ddd;border-radius:20px;padding:5px 10px;font-size:10px}.title{font-size:11px;font-weight:700;letter-spacing:1.2px;margin:22px 0 10px}.table{width:100%;border-collapse:collapse}.table th{background:#111;color:#fff;font-size:9px;text-align:left;padding:10px}.table td{padding:12px 10px;border-bottom:1px solid #eee;font-size:11px}.table small{display:block;color:#888;margin-top:4px;font-size:9px}.amt{text-align:right}.sum{width:310px;margin:20px 0 0 auto}.sum div{display:flex;justify-content:space-between;padding:5px 0;font-size:11px}.sum .total{margin-top:7px;border-top:1px solid #111;padding-top:10px;font-size:15px;font-weight:800}.address{border:1px solid #e7e7e7;border-radius:10px;padding:16px;font-size:11px;line-height:1.6}.foot{margin-top:35px;padding-top:15px;border-top:1px solid #eee;color:#999;font-size:9px;display:flex;justify-content:space-between}</style></head><body><div class="page"><div class="head"><div class="brand">YOUR TYPE</div><div class="inv">ORDER INVOICE</div></div><div class="meta"><span>Order ID: <b>'+escDetail(id)+'</b></span><span>'+escDetail(o.date?new Date(o.date).toLocaleString('en-IN'):'')+'</span></div><div class="grid"><div class="card"><div class="label">Payment</div><div class="value"><b>'+escDetail(String(o.payment||'COD').toUpperCase())+'</b></div></div><div class="card"><div class="label">Order status</div><div class="value"><span class="status">'+escDetail(o.status||'Confirmed')+'</span></div></div></div><div class="title">ORDER ITEMS</div><table class="table"><thead><tr><th>PRODUCT</th><th>QTY</th><th style="text-align:right">AMOUNT</th></tr></thead><tbody>'+items+'</tbody></table><div class="sum"><div><span>Subtotal</span><b>'+moneyDetail(o.subtotal)+'</b></div>'+(Number(o.discount||0)>0?'<div><span>Discount</span><b>−'+moneyDetail(o.discount)+'</b></div>':'')+'<div><span>Shipping</span><b>'+(Number(o.shipping||0)>0?moneyDetail(o.shipping):'FREE')+'</b></div><div><span>Taxable value</span><b>'+moneyDetail(o.taxableSubtotal)+'</b></div><div><span>GST included</span><b>'+moneyDetail(o.gst)+'</b></div><div class="total"><span>TOTAL</span><span>'+moneyDetail(o.total)+'</span></div></div><div class="title">SHIPPING ADDRESS</div><div class="address">'+addr+'</div><div class="foot"><span>Thank you for shopping with YOUR TYPE.</span><span>Server-confirmed invoice</span></div></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>');w.document.close();return;
   }
-  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=doc.internal.pageSize.getWidth(); let y=48;
-  doc.setFont('helvetica','bold');doc.setFontSize(20);doc.text('YOUR TYPE',40,y);doc.setFontSize(11);doc.text('ORDER INVOICE',W-40,y,{align:'right'});
-  y+=24;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(90);doc.text('Order ID: '+id,40,y);doc.text('Date: '+(o.date?new Date(o.date).toLocaleString('en-IN'):'—'),W-40,y,{align:'right'});
-  y+=24;doc.setTextColor(30);doc.setFont('helvetica','bold');doc.text('ORDER DETAILS',40,y);y+=15;doc.setFont('helvetica','normal');doc.text('Payment: '+String(o.payment||'COD').toUpperCase(),40,y);doc.text('Status: '+(o.status||'Confirmed'),W-40,y,{align:'right'});
-  y+=22;doc.setDrawColor(220);doc.line(40,y,W-40,y);y+=18;doc.setFont('helvetica','bold');doc.text('PRODUCT',40,y);doc.text('QTY',350,y);doc.text('PRICE',W-40,y,{align:'right'});y+=15;doc.setFont('helvetica','normal');
-  for(const it of (o.items||[])){if(y>735){doc.addPage();y=48;}const qty=Math.max(1,Number(it.qty||1));const line=Number(it.price||0)*qty;doc.text(String(it.name||'Product').slice(0,48),40,y);doc.text(String(qty),350,y);doc.text(moneyDetail(line),W-40,y,{align:'right'});y+=14;doc.setFontSize(8);doc.setTextColor(100);doc.text('SKU '+String(it.sku||'—')+' · Size '+String(it.size||'—')+' · Color '+String(it.color||'—')+(it.hsn?' · HSN '+String(it.hsn):''),40,y);doc.setFontSize(9);doc.setTextColor(30);y+=17;}
-  y+=6;doc.setDrawColor(220);doc.line(40,y,W-40,y);y+=18;const rows=[['Subtotal',o.subtotal],['Discount',-Number(o.discount||0)],['Shipping',Number(o.shipping||0)],['Taxable value',Number(o.taxableSubtotal||0)],['GST',Number(o.gst||0)]];doc.setFontSize(9);for(const [label,val] of rows){doc.text(label,350,y);doc.text(moneyDetail(val),W-40,y,{align:'right'});y+=15;}doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('TOTAL',350,y+3);doc.text(moneyDetail(o.total),W-40,y+3,{align:'right'});
-  y+=35;doc.setFontSize(9);doc.text('SHIPPING ADDRESS',40,y);y+=14;doc.setFont('helvetica','normal');doc.setTextColor(70);const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join(' · ');doc.text(doc.splitTextToSize(addr,W-80),40,y);
-  y+=42;doc.setTextColor(120);doc.setFontSize(8);doc.text('Generated from the server-confirmed order details. GST shown as recorded for this order.',40,y);
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+  const M=42, contentW=W-M*2;
+  let y=0;
+  const black=[18,18,18], dark=[35,35,35], gray=[105,105,105], light=[242,242,242], line=[225,225,225];
+  const money=v=>moneyDetail(v);
+  const rounded=(x,yy,w,h,r=8,fill=light,stroke=line)=>{doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(x,yy,w,h,r,r,'FD')};
+  const text=(t,x,yy,size=9,weight='normal',color=dark,opts={})=>{doc.setFont('helvetica',weight);doc.setFontSize(size);doc.setTextColor(...color);doc.text(String(t??''),x,yy,opts)};
+  const wrap=(t,x,yy,max,size=9,weight='normal',color=dark)=>{doc.setFont('helvetica',weight);doc.setFontSize(size);doc.setTextColor(...color);const a=doc.splitTextToSize(String(t??''),max);doc.text(a,x,yy);return yy+a.length*(size+3)};
+  const header=()=>{doc.setFillColor(...black);doc.rect(0,0,W,94,'F');text('YOUR TYPE',M,40,23,'bold',[255,255,255]);text('PREMIUM STREETWEAR',M,58,7,'normal',[190,190,190]);text('ORDER INVOICE',W-M,39,10,'bold',[255,255,255],{align:'right'});text('INVOICE',W-M,56,7,'normal',[175,175,175],{align:'right'});};
+  const footer=()=>{doc.setDrawColor(...line);doc.line(M,H-48,W-M,H-48);text('YOUR TYPE  ·  Thank you for shopping with us.',M,H-31,8,'normal',gray);text('Server-confirmed invoice',W-M,H-31,8,'normal',gray,{align:'right'});};
+  header();y=122;
+  text('Order ID',M,y,8,'bold',gray);text(String(id),M,y+15,11,'bold',dark);text('Order date',W/2,y,8,'bold',gray);text(o.date?new Date(o.date).toLocaleString('en-IN'):'—',W/2,y+15,10,'normal',dark);y+=42;
+  const cardW=(contentW-12)/2;rounded(M,y,cardW,55);rounded(M+cardW+12,y,cardW,55);text('PAYMENT',M+14,y+17,7,'bold',gray);text(String(o.payment||'COD').toUpperCase(),M+14,y+36,11,'bold',dark);text('ORDER STATUS',M+cardW+26,y+17,7,'bold',gray);text(String(o.status||'Confirmed'),M+cardW+26,y+36,11,'bold',dark);y+=78;
+  text('ORDER ITEMS',M,y,9,'bold',dark);y+=14;
+  doc.setFillColor(...black);doc.roundedRect(M,y,contentW,25,5,5,'F');text('PRODUCT',M+12,y+16,7,'bold',[255,255,255]);text('QTY',M+contentW-125,y+16,7,'bold',[255,255,255]);text('AMOUNT',M+contentW-12,y+16,7,'bold',[255,255,255],{align:'right'});y+=25;
+  const items=o.items||[];
+  for(const it of items){
+    const qty=Math.max(1,Number(it.qty||1)), lineTotal=Number(it.price||0)*qty;
+    const rowH=42;
+    if(y+rowH>H-160){footer();doc.addPage();header();y=122;}
+    doc.setDrawColor(...line);doc.line(M,y+rowH, M+contentW,y+rowH);
+    text(String(it.name||'Product').slice(0,48),M+12,y+16,9,'bold',dark);
+    text('SKU '+String(it.sku||'—')+'  ·  Size '+String(it.size||'—')+'  ·  Color '+String(it.color||'—'),M+12,y+31,7,'normal',gray);
+    text(qty,M+contentW-125,y+22,9,'normal',dark);
+    text(money(lineTotal),M+contentW-12,y+22,9,'bold',dark,{align:'right'});y+=rowH;
+  }
+  y+=22;
+  const sumX=M+contentW-235, valX=M+contentW-12;
+  const summary=[['Subtotal',o.subtotal],...(Number(o.discount||0)>0?[['Discount','−'+money(o.discount)]]:[]),['Shipping',Number(o.shipping||0)>0?money(o.shipping):'FREE'],['Taxable value',o.taxableSubtotal],['GST included',o.gst]];
+  rounded(sumX,y,235,summary.length*20+55,8,[248,248,248],[232,232,232]);
+  let sy=y+18;for(const [lab,val] of summary){text(lab,sumX+14,sy,8,'normal',gray);text(typeof val==='string'?val:money(val),valX,sy,8,'bold',dark,{align:'right'});sy+=20;}
+  doc.setDrawColor(...black);doc.line(sumX+12,sy-6,valX,sy-6);text('TOTAL',sumX+14,sy+13,10,'bold',dark);text(money(o.total),valX,sy+13,14,'bold',black,{align:'right'});y+=summary.length*20+78;
+  text('SHIPPING ADDRESS',M,y,9,'bold',dark);y+=14;
+  const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('  ·  ');
+  const addrH=52;rounded(M,y,contentW,addrH);wrap(addr,M+14,y+21,contentW-28,9,'normal',dark);y+=addrH+24;
+  if(Number(o.cgst||0)>0||Number(o.sgst||0)>0||Number(o.igst||0)>0){
+    text('TAX BREAKUP',M,y,8,'bold',gray);y+=14;
+    const parts=Number(o.igst||0)>0?[['IGST',o.igst]]:[['CGST',o.cgst],['SGST',o.sgst]];
+    let x=M;for(const [lab,val] of parts){rounded(x,y,110,42);text(lab,x+12,y+16,7,'bold',gray);text(money(val),x+12,y+32,10,'bold',dark);x+=122;}
+  }
+  footer();
   doc.save('YOUR_TYPE_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf');
 }
+
 
 function continueShopping(){
  window.ytNavigate('index.html');

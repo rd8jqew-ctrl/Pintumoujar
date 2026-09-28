@@ -225,27 +225,26 @@ async function useCurrentLocation(){
   locationBtn.disabled=true;setLocationStatus('Detecting your location…','loading');
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
-      // Use a client-side GPS reverse-geocoder so the locality comes from the
-      // device coordinates directly. This is more appropriate for delivery-area
-      // detection than using the PIN's administrative district (e.g. "North West Delhi").
+      // GPS coordinates are reverse-geocoded directly in the browser. This avoids
+      // the old server-side district/address result that could label a locality
+      // with the wrong Delhi administrative district.
       const url='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(pos.coords.latitude)+'&longitude='+encodeURIComponent(pos.coords.longitude)+'&localityLanguage=en';
       const r=await fetch(url,{cache:'no-store'});
       const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.description||'Could not detect the address');
       const pin=String(d.postcode||'').replace(/\D/g,'').slice(0,6);
       const detectedLocality=String(d.locality||'').trim();
-      const detectedCity=String(d.city||'').trim()||detectedLocality;
+      let detectedCity=String(d.city||'').trim()||detectedLocality;
       const detectedState=String(d.principalSubdivision||'').trim();
+      if(/^(?:new\s+delhi|delhi(?:\s+(?:north|south|east|west|central|northeast|northwest|southeast|southwest))?)$/i.test(detectedCity))detectedCity='Delhi';
       if(pin.length!==6||!detectedState)throw new Error('A complete location could not be detected. Please enter the address manually.');
       const addr=document.getElementById('customerAddress');
-      // Do not pretend GPS knows the house/flat number. Put only the detected
-      // locality into the address field so the customer can append the exact unit.
-      if(addr&&detectedLocality)addr.value=detectedLocality;
+      // GPS supplies locality only. Customer still confirms the exact house/flat/room.
+      if(addr&&detectedLocality){const existing=String(addr.value||'').trim();const same=new RegExp('(?:^|[, ]+)'+detectedLocality.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:$|[, ])','i').test(existing);if(!existing)addr.value=detectedLocality;else if(!same)addr.value=existing+', '+detectedLocality;}
       const pinEl=document.getElementById('customerPin'); if(pinEl)pinEl.value=pin;
       const cityEl=document.getElementById('customerCity');
       if(cityEl&&detectedCity){
-        const existing=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());
-        if(existing){cityEl.value=existing.value;}
-        else{cityEl.innerHTML='<option value="'+escDetail(detectedCity)+'">'+escDetail(detectedCity)+'</option>';cityEl.disabled=false;cityEl.value=detectedCity;}
+        const opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());
+        if(opt)cityEl.value=opt.value; else {cityEl.innerHTML='<option value="'+escDetail(detectedCity)+'">'+escDetail(detectedCity)+'</option>';cityEl.disabled=false;cityEl.value=detectedCity;}
       }
       const stateEl=document.getElementById('customerState');
       if(stateEl&&detectedState){const opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(opt)stateEl.value=opt.value;}
@@ -402,63 +401,132 @@ async function downloadCustomerInvoice(){
   try{o=JSON.parse(localStorage.getItem('yourTypeLastOrder')||localStorage.getItem('yourTypeLastPurchase')||'null')}catch(_){ }
   const id=o?.orderId||document.getElementById('doneOrderId')?.textContent||'';
   if(!id){alert('Order ID not found.');return;}
-  try{const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});if(r.ok)o=await r.json()}catch(_){ }
-  if(!o){alert('Invoice details are temporarily unavailable. Please try again.');return;}
+  const btn=document.querySelector('.detailInvoice');
+  const oldText=btn?.textContent;
+  if(btn){btn.disabled=true;btn.textContent='PREPARING PDF…';}
+  try{
+    try{const r=await fetch('/api/orders/'+encodeURIComponent(id),{cache:'no-store'});if(r.ok)o=await r.json()}catch(_){ }
+    if(!o)throw new Error('Invoice details are temporarily unavailable. Please try again.');
 
-  const load=(src,test)=>test()?Promise.resolve(true):new Promise(resolve=>{const sc=document.createElement('script');sc.src=src;sc.onload=()=>resolve(true);sc.onerror=()=>resolve(false);document.head.appendChild(sc)});
-  const ok=await load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf?.jsPDF);
-  if(!ok){
-    const w=window.open('','_blank','noopener,noreferrer');
-    if(!w){alert('Please allow pop-ups to print/download your invoice.');return;}
-    const items=(o.items||[]).map(i=>'<tr><td><b>'+escDetail(i.name||'Product')+'</b><small>'+escDetail(i.sku?'SKU '+i.sku:'')+(i.size?' · Size '+i.size:'')+(i.color?' · '+i.color:'')+'</small></td><td>'+Number(i.qty||1)+'</td><td class="amt">'+moneyDetail(Number(i.price||0)*Number(i.qty||1))+'</td></tr>').join('');
-    const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('<br>');
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>YOUR TYPE Invoice '+escDetail(id)+'</title><style>*{box-sizing:border-box}body{margin:0;background:#f3f3f3;font-family:Arial,sans-serif;color:#151515}.page{width:794px;min-height:1123px;margin:0 auto;background:#fff;padding:42px 46px}.head{background:#111;color:#fff;padding:28px 30px;margin:-42px -46px 30px;display:flex;justify-content:space-between}.brand{font-size:24px;font-weight:800;letter-spacing:3px}.inv{font-size:12px;letter-spacing:2px}.meta{display:flex;justify-content:space-between;color:#666;font-size:11px;margin-bottom:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px}.card{border:1px solid #e7e7e7;border-radius:10px;padding:15px}.label{font-size:9px;color:#888;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px}.value{font-size:12px;line-height:1.55}.status{display:inline-block;border:1px solid #ddd;border-radius:20px;padding:5px 10px;font-size:10px}.title{font-size:11px;font-weight:700;letter-spacing:1.2px;margin:22px 0 10px}.table{width:100%;border-collapse:collapse}.table th{background:#111;color:#fff;font-size:9px;text-align:left;padding:10px}.table td{padding:12px 10px;border-bottom:1px solid #eee;font-size:11px}.table small{display:block;color:#888;margin-top:4px;font-size:9px}.amt{text-align:right}.sum{width:310px;margin:20px 0 0 auto}.sum div{display:flex;justify-content:space-between;padding:5px 0;font-size:11px}.sum .total{margin-top:7px;border-top:1px solid #111;padding-top:10px;font-size:15px;font-weight:800}.address{border:1px solid #e7e7e7;border-radius:10px;padding:16px;font-size:11px;line-height:1.6}.foot{margin-top:35px;padding-top:15px;border-top:1px solid #eee;color:#999;font-size:9px;display:flex;justify-content:space-between}</style></head><body><div class="page"><div class="head"><div class="brand">YOUR TYPE</div><div class="inv">ORDER INVOICE</div></div><div class="meta"><span>Order ID: <b>'+escDetail(id)+'</b></span><span>'+escDetail(o.date?new Date(o.date).toLocaleString('en-IN'):'')+'</span></div><div class="grid"><div class="card"><div class="label">Payment</div><div class="value"><b>'+escDetail(String(o.payment||'COD').toUpperCase())+'</b></div></div><div class="card"><div class="label">Order status</div><div class="value"><span class="status">'+escDetail(o.status||'Confirmed')+'</span></div></div></div><div class="title">ORDER ITEMS</div><table class="table"><thead><tr><th>PRODUCT</th><th>QTY</th><th style="text-align:right">AMOUNT</th></tr></thead><tbody>'+items+'</tbody></table><div class="sum"><div><span>Subtotal</span><b>'+moneyDetail(o.subtotal)+'</b></div>'+(Number(o.discount||0)>0?'<div><span>Discount</span><b>−'+moneyDetail(o.discount)+'</b></div>':'')+'<div><span>Shipping</span><b>'+(Number(o.shipping||0)>0?moneyDetail(o.shipping):'FREE')+'</b></div><div><span>Taxable value</span><b>'+moneyDetail(o.taxableSubtotal)+'</b></div><div><span>GST included</span><b>'+moneyDetail(o.gst)+'</b></div><div class="total"><span>TOTAL</span><span>'+moneyDetail(o.total)+'</span></div></div><div class="title">SHIPPING ADDRESS</div><div class="address">'+addr+'</div><div class="foot"><span>Thank you for shopping with YOUR TYPE.</span><span>Server-confirmed invoice</span></div></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>');w.document.close();return;
-  }
+    /* CUSTOMER PDF — self-contained, no CDN, no print dialog. */
+    const N=v=>Number(v||0);
+    const moneyPdf=v=>'Rs. '+N(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const clean=v=>String(v??'').replace(/[\r\n]+/g,' ').replace(/[₹€£]/g,'Rs.').replace(/[·•]/g,'-').trim();
+    const esc=v=>clean(v).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+    const wrap=(value,max)=>{const words=clean(value).split(/\s+/).filter(Boolean),lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(t.length<=max)line=t;else{if(line)lines.push(line);line=w;}}if(line)lines.push(line);return lines.length?lines:['-'];};
+    const W=595,H=842,M=38,CW=W-M*2;
+    const pages=[];let cmds=[],y=804;
+    const C={black:'0.05 0.05 0.05',dark:'0.13 0.13 0.13',mid:'0.28 0.28 0.28',gray:'0.45 0.45 0.45',line:'0.86 0.86 0.86',light:'0.965 0.965 0.965',white:'1 1 1'};
+    const push=x=>cmds.push(x);
+    const text=(v,x,yy,size=9,bold=false,color=C.dark)=>push(`${color} rg BT /${bold?'F2':'F1'} ${size} Tf ${x} ${yy} Td (${esc(v)}) Tj ET`);
+    const approxWidth=(v,size)=>Math.min(240,clean(v).length*size*0.50);
+    const textRight=(v,right,yy,size=9,bold=false,color=C.dark)=>text(v,right-approxWidth(v,size),yy,size,bold,color);
+    const line=(x1,y1,x2,y2)=>push(`${C.line} RG 0.7 w ${x1} ${y1} m ${x2} ${y2} l S`);
+    const box=(x,yy,w,h,color=C.light)=>push(`${color} rg ${x} ${yy} ${w} ${h} re f`);
+    const badge=(label,x,yy,w)=>{box(x,yy,w,22,C.light);text(label,x+8,yy+8,7,true,C.mid);};
+    const footer=pageNo=>{line(M,31,W-M,31);text('YOUR TYPE  /  PREMIUM STREETWEAR',M,18,7,true,C.gray);text('Customer copy  -  Page '+pageNo,430,18,7,false,C.gray);};
+    const nextPage=()=>{if(cmds.length)pages.push(cmds.join('\n'));cmds=[];y=804;};
+    const section=title=>{if(y<115){footer(pages.length+1);nextPage();}text(title.toUpperCase(),M,y,8,true,C.gray);y-=16;};
 
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'pt',format:'a4'});
-  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
-  const M=42, contentW=W-M*2;
-  let y=0;
-  const black=[18,18,18], dark=[35,35,35], gray=[105,105,105], light=[242,242,242], line=[225,225,225];
-  const money=v=>moneyDetail(v);
-  const rounded=(x,yy,w,h,r=8,fill=light,stroke=line)=>{doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(x,yy,w,h,r,r,'FD')};
-  const text=(t,x,yy,size=9,weight='normal',color=dark,opts={})=>{doc.setFont('helvetica',weight);doc.setFontSize(size);doc.setTextColor(...color);doc.text(String(t??''),x,yy,opts)};
-  const wrap=(t,x,yy,max,size=9,weight='normal',color=dark)=>{doc.setFont('helvetica',weight);doc.setFontSize(size);doc.setTextColor(...color);const a=doc.splitTextToSize(String(t??''),max);doc.text(a,x,yy);return yy+a.length*(size+3)};
-  const header=()=>{doc.setFillColor(...black);doc.rect(0,0,W,94,'F');text('YOUR TYPE',M,40,23,'bold',[255,255,255]);text('PREMIUM STREETWEAR',M,58,7,'normal',[190,190,190]);text('ORDER INVOICE',W-M,39,10,'bold',[255,255,255],{align:'right'});text('INVOICE',W-M,56,7,'normal',[175,175,175],{align:'right'});};
-  const footer=()=>{doc.setDrawColor(...line);doc.line(M,H-48,W-M,H-48);text('YOUR TYPE  ·  Thank you for shopping with us.',M,H-31,8,'normal',gray);text('Server-confirmed invoice',W-M,H-31,8,'normal',gray,{align:'right'});};
-  header();y=122;
-  text('Order ID',M,y,8,'bold',gray);text(String(id),M,y+15,11,'bold',dark);text('Order date',W/2,y,8,'bold',gray);text(o.date?new Date(o.date).toLocaleString('en-IN'):'—',W/2,y+15,10,'normal',dark);y+=42;
-  const cardW=(contentW-12)/2;rounded(M,y,cardW,55);rounded(M+cardW+12,y,cardW,55);text('PAYMENT',M+14,y+17,7,'bold',gray);text(String(o.payment||'COD').toUpperCase(),M+14,y+36,11,'bold',dark);text('ORDER STATUS',M+cardW+26,y+17,7,'bold',gray);text(String(o.status||'Confirmed'),M+cardW+26,y+36,11,'bold',dark);y+=78;
-  text('ORDER ITEMS',M,y,9,'bold',dark);y+=14;
-  doc.setFillColor(...black);doc.roundedRect(M,y,contentW,25,5,5,'F');text('PRODUCT',M+12,y+16,7,'bold',[255,255,255]);text('QTY',M+contentW-125,y+16,7,'bold',[255,255,255]);text('AMOUNT',M+contentW-12,y+16,7,'bold',[255,255,255],{align:'right'});y+=25;
-  const items=o.items||[];
-  for(const it of items){
-    const qty=Math.max(1,Number(it.qty||1)), lineTotal=Number(it.price||0)*qty;
-    const rowH=42;
-    if(y+rowH>H-160){footer();doc.addPage();header();y=122;}
-    doc.setDrawColor(...line);doc.line(M,y+rowH, M+contentW,y+rowH);
-    text(String(it.name||'Product').slice(0,48),M+12,y+16,9,'bold',dark);
-    text('SKU '+String(it.sku||'—')+'  ·  Size '+String(it.size||'—')+'  ·  Color '+String(it.color||'—'),M+12,y+31,7,'normal',gray);
-    text(qty,M+contentW-125,y+22,9,'normal',dark);
-    text(money(lineTotal),M+contentW-12,y+22,9,'bold',dark,{align:'right'});y+=rowH;
-  }
-  y+=22;
-  const sumX=M+contentW-235, valX=M+contentW-12;
-  const summary=[['Subtotal',o.subtotal],...(Number(o.discount||0)>0?[['Discount','−'+money(o.discount)]]:[]),['Shipping',Number(o.shipping||0)>0?money(o.shipping):'FREE'],['Taxable value',o.taxableSubtotal],['GST included',o.gst]];
-  rounded(sumX,y,235,summary.length*20+55,8,[248,248,248],[232,232,232]);
-  let sy=y+18;for(const [lab,val] of summary){text(lab,sumX+14,sy,8,'normal',gray);text(typeof val==='string'?val:money(val),valX,sy,8,'bold',dark,{align:'right'});sy+=20;}
-  doc.setDrawColor(...black);doc.line(sumX+12,sy-6,valX,sy-6);text('TOTAL',sumX+14,sy+13,10,'bold',dark);text(money(o.total),valX,sy+13,14,'bold',black,{align:'right'});y+=summary.length*20+78;
-  text('SHIPPING ADDRESS',M,y,9,'bold',dark);y+=14;
-  const addr=[o.name||o.customer,o.address,o.city,o.state,o.pin,o.phone?'Phone: '+o.phone:''].filter(Boolean).join('  ·  ');
-  const addrH=52;rounded(M,y,contentW,addrH);wrap(addr,M+14,y+21,contentW-28,9,'normal',dark);y+=addrH+24;
-  if(Number(o.cgst||0)>0||Number(o.sgst||0)>0||Number(o.igst||0)>0){
-    text('TAX BREAKUP',M,y,8,'bold',gray);y+=14;
-    const parts=Number(o.igst||0)>0?[['IGST',o.igst]]:[['CGST',o.cgst],['SGST',o.sgst]];
-    let x=M;for(const [lab,val] of parts){rounded(x,y,110,42);text(lab,x+12,y+16,7,'bold',gray);text(money(val),x+12,y+32,10,'bold',dark);x+=122;}
-  }
-  footer();
-  doc.save('YOUR_TYPE_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf');
+    /* Header */
+    box(0,744,W,98,C.black);
+    text('YOUR TYPE',M,808,23,true,C.white);
+    text('PREMIUM STREETWEAR',M,790,7,false,'0.72 0.72 0.72');
+    textRight('ORDER INVOICE',W-M,808,12,true,C.white);
+    textRight('CUSTOMER COPY',W-M,790,7,false,'0.70 0.70 0.70');
+
+    y=716;
+    text('ORDER ID',M,y,7,true,C.gray);text(id,M,y-16,11,true,C.dark);
+    text('ORDER DATE',M+205,y,7,true,C.gray);
+    text(o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'-',M+205,y-16,9,false,C.dark);
+    text('PAYMENT',W-M-145,y,7,true,C.gray);
+    text(String(o.payment||'COD').toUpperCase(),W-M-145,y-16,9,true,C.dark);
+    y-=50;
+
+    const status=String(o.status||'Confirmed').toUpperCase();
+    badge('STATUS  '+status,M,y-22,145);
+    if(o.courier)badge('COURIER  '+clean(o.courier),M+155,y-22,150);
+    if(o.awb)badge('AWB  '+clean(o.awb),M+315,y-22,140);
+    y-=44;
+
+    section('Order items');
+    box(M,y-23,CW,23,C.black);
+    text('PRODUCT DETAILS',M+10,y-15,7,true,C.white);
+    textRight('QTY',W-M-105,y-15,7,true,C.white);
+    textRight('AMOUNT',W-M-10,y-15,7,true,C.white);
+    y-=39;
+    const items=Array.isArray(o.items)?o.items:[];
+    if(!items.length){text('No item details available.',M+10,y-12,9,false,C.gray);y-=35;}
+    for(const it of items){
+      const qty=Math.max(1,N(it.qty)||1),total=N(it.price)*qty;
+      const details=[it.name||'Product','SKU '+(it.sku||'-'),'Size '+(it.size||'-'),'Color '+(it.color||'-'),it.hsn?'HSN '+it.hsn:'',N(it.gstRate)>0?'GST '+it.gstRate+'%':''].filter(Boolean).join('  /  ');
+      const lines=wrap(details,68);const rowH=Math.max(34,lines.length*11+13);
+      if(y-rowH<175){footer(pages.length+1);nextPage();section('Order items - continued');}
+      lines.forEach((ln,i)=>text(ln,M+10,y-10-i*11,i===0?9:7,i===0,i===0?C.dark:C.gray));
+      textRight(String(qty),W-M-105,y-15,9,false,C.dark);
+      textRight(moneyPdf(total),W-M-10,y-15,8,true,C.dark);
+      line(M,y-rowH,W-M,y-rowH);y-=rowH;
+    }
+    y-=18;
+
+    /* Totals card */
+    const summary=[['Subtotal',moneyPdf(o.subtotal)]];
+    if(N(o.discount)>0)summary.push(['Discount','- '+moneyPdf(o.discount)]);
+    summary.push(['Shipping',N(o.shipping)>0?moneyPdf(o.shipping):'FREE']);
+    if(o.taxableSubtotal!==undefined)summary.push(['Taxable value',moneyPdf(o.taxableSubtotal)]);
+    if(N(o.gst)>0)summary.push(['GST included'+(N(o.gstRate)>0?' @ '+o.gstRate+'%':''),moneyPdf(o.gst)]);
+    const boxH=summary.length*19+52,sx=W-M-245;
+    if(y-boxH<310){footer(pages.length+1);nextPage();}
+    box(sx,y-boxH,245,boxH,'0.97 0.97 0.97');let sy=y-17;
+    for(const row of summary){text(row[0],sx+12,sy,8,false,C.gray);textRight(row[1],W-M-12,sy,8,true,C.dark);sy-=19;}
+    line(sx+12,sy+7,W-M-12,sy+7);
+    text('TOTAL',sx+12,sy-10,10,true,C.dark);textRight(moneyPdf(o.total),W-M-12,sy-11,14,true,C.black);
+    y-=boxH+24;
+
+    section('Shipping address');
+    const city=clean(o.city),state=clean(o.state);
+    const cityState=city&&state?(city.toLowerCase()===state.toLowerCase()?city:city+', '+state):(city||state);
+    const addressLines=[o.name||o.customer,o.address,cityState,o.district?'District: '+o.district:'',o.pin?'PIN: '+o.pin:'',o.phone?'Phone: '+o.phone:''].filter(v=>clean(v));
+    const addrH=Math.max(74,addressLines.length*14+28);
+    if(y-addrH<190){footer(pages.length+1);nextPage();section('Shipping address');}
+    box(M,y-addrH,CW,addrH,'0.97 0.97 0.97');let ay=y-19;
+    addressLines.forEach((ln,i)=>{wrap(ln,82).slice(0,3).forEach(part=>{text(part,M+14,ay,9,i===0,i===0?C.dark:C.mid);ay-=13;});});
+    y-=addrH+22;
+
+    if(N(o.cgst)>0||N(o.sgst)>0||N(o.igst)>0){
+      section('GST breakup');
+      const parts=N(o.igst)>0?[['IGST',o.igst]]:[['CGST',o.cgst],['SGST',o.sgst]];
+      let x=M;for(const [lab,val] of parts){box(x,y-42,120,42,C.light);text(lab,x+10,y-17,7,true,C.gray);text(moneyPdf(val),x+10,y-34,9,true,C.dark);x+=132;}y-=60;
+    }
+
+    /* Delivery / payment note */
+    if(y<105){footer(pages.length+1);nextPage();}
+    box(M,y-58,CW,58,C.black);
+    text(String(o.payment||'cod').toLowerCase()==='cod'?'CASH ON DELIVERY':'PAYMENT RECEIVED',M+14,y-18,8,true,C.white);
+    text(String(o.payment||'COD').toUpperCase()==='COD'?'Please keep the payable amount ready at delivery.':'Your payment method is recorded on this order.',M+14,y-34,7,false,'0.76 0.76 0.76');
+    text('Order status: '+status,M+14,y-47,7,false,'0.62 0.62 0.62');
+    y-=78;
+    text('This is a computer-generated order invoice. No signature is required.',M,48,7,false,C.gray);
+    footer(pages.length+1);nextPage();
+
+    /* Build a standards-compliant PDF with Helvetica fonts only, so Android can open it without external assets. */
+    const objs=[],add=s=>{objs.push(s);return objs.length};
+    const f1=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    const f2=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+    const contentIds=[];for(const stream of pages){const sid=add(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`);contentIds.push(sid);}
+    const pagesId=add('');const catalogId=add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+    const pageIds=[];for(const sid of contentIds)pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${sid} 0 R >>`));
+    objs[pagesId-1]=`<< /Type /Pages /Kids [${pageIds.map(n=>n+' 0 R').join(' ')}] /Count ${pageIds.length} >>`;
+    let pdf='%PDF-1.4\n%',offsets=[0];
+    for(let i=0;i<objs.length;i++){offsets[i+1]=new TextEncoder().encode(pdf).length;pdf+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}
+    const xref=new TextEncoder().encode(pdf).length;pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
+    for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+    pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root '+catalogId+' 0 R >>\nstartxref\n'+xref+'\n%%EOF';
+    const blob=new Blob([new TextEncoder().encode(pdf)],{type:'application/pdf'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='YOUR_TYPE_ORDER_INVOICE_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf';document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(err){console.error('Customer invoice PDF failed:',err);alert('Invoice could not be downloaded. Please try again.');}
+  finally{if(btn){btn.disabled=false;btn.textContent=oldText||'DOWNLOAD INVOICE ↓';}}
 }
 
 

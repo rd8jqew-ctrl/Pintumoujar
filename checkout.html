@@ -27,7 +27,7 @@
 <main class="checkoutPage">
   <div>
     <p class="eyebrow">YOUR TYPE / CHECKOUT</p>
-    <h1>Order<br>confirmed.</h1>
+    <h1>Complete<br>your order.</h1>
     <form onsubmit="placeOrder(event)" class="form" id="checkoutForm">
       <div><input id="couponCode" placeholder="Coupon code" autocomplete="off"><button type="button" onclick="applyCoupon()">APPLY COUPON</button><small id="couponMsg"></small></div>
       <input id="customerName" required placeholder="Full name" autocomplete="name">
@@ -223,7 +223,7 @@ function setLocationStatus(msg,type=''){if(!locationStatus)return;locationStatus
 async function useCurrentLocation(){
   if(!navigator.geolocation){setLocationStatus('Location is not supported on this device. Please enter the address manually.','error');return;}
   if(!window.isSecureContext){setLocationStatus('Location needs a secure connection (HTTPS). Please open the live HTTPS site and try again.','error');return;}
-  locationBtn.disabled=true;setLocationStatus('Detecting your location…','loading');
+  locationBtn.disabled=true;setLocationStatus('Getting a precise GPS fix…','loading');
   const reverseWithServer=async(pos)=>{
     const qs='?lat='+encodeURIComponent(pos.coords.latitude)+'&lon='+encodeURIComponent(pos.coords.longitude);
     const r=await fetch('/api/reverse-geocode'+qs,{cache:'no-store',headers:{'Accept':'application/json'}});
@@ -231,50 +231,49 @@ async function useCurrentLocation(){
     if(!r.ok)throw new Error(d.error||'Server location lookup failed');
     return d;
   };
-  const reverseWithBDC=async(pos)=>{
-    const url='https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+encodeURIComponent(pos.coords.latitude)+'&longitude='+encodeURIComponent(pos.coords.longitude)+'&localityLanguage=en';
-    const r=await fetch(url,{cache:'no-store'});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.description||'Backup location lookup failed');
-    return d;
-  };
-  const applyLocation=(d)=>{
+  const normalizeText=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const applyLocation=(d,accuracy)=>{
     const pin=String(d.pin||d.postcode||'').replace(/\D/g,'').slice(0,6);
     const detectedLocality=String(d.locality||d.neighbourhood||d.suburb||d.city||'').trim();
     let detectedCity=String(d.city||'').trim()||detectedLocality;
     const detectedState=String(d.state||d.principalSubdivision||'').trim();
-    // Delhi district names are administrative areas, not the City/Town value.
     if(/^delhi$/i.test(detectedState)||/^(?:new\s+delhi|(?:north|south|east|west|central|north\s*east|north\s*west|south\s*east|south\s*west)\s+delhi)$/i.test(detectedCity))detectedCity='Delhi';
     if(!detectedCity&&/delhi/i.test(String(d.district||'')))detectedCity='Delhi';
-    if(pin.length!==6||!detectedState||!detectedCity)throw new Error('GPS found your position, but the address service did not return a complete PIN/City/State. Please try once more.');
-    const addr=document.getElementById('customerAddress');
-    // Do not overwrite the user's existing house/street details.
-    if(addr&&detectedLocality){
-      const existing=String(addr.value||'').trim();
-      const re=new RegExp('(?:^|[, ]+)'+detectedLocality.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')+'(?:$|[, ])','i');
-      if(!existing)addr.value=detectedLocality; else if(!re.test(existing))addr.value=existing+', '+detectedLocality;
+    if(pin.length!==6||!detectedState||!detectedCity)throw new Error('GPS could not return a complete postal PIN/City/State. Please enter your PIN manually.');
+
+    // GPS is only allowed to fill delivery fields when the phone reports a
+    // genuinely precise fix. A coarse Android/Chrome fix can jump between
+    // nearby Delhi postal areas (for example 110033 vs 110043), so never
+    // silently turn an approximate coordinate into a customer address.
+    if(Number.isFinite(accuracy)&&accuracy>50){
+      throw new Error('Your GPS fix is only accurate to about '+Math.round(accuracy)+' m. Turn ON Precise location for Chrome and try again.');
     }
-    const pinEl=document.getElementById('customerPin');if(pinEl)pinEl.value=pin;
+
+    const addr=document.getElementById('customerAddress');
+    // Do not overwrite a customer-entered house/street address. Only add the
+    // detected locality when the field is empty and the GPS fix is precise.
+    // Never write a reverse-geocoder locality into the customer's street-address field.
+    // Locality names can be wrong at postal boundaries; the customer must enter/confirm
+    // the actual house/flat/street address themselves.
+    if(addr && !String(addr.value||'').trim()) addr.value='';
+
+    const pinEl=document.getElementById('customerPin');if(pinEl && !String(pinEl.value||'').trim())pinEl.value=pin;
     const cityEl=document.getElementById('customerCity');
-    if(cityEl){let opt=[...cityEl.options].find(o=>o.value.toLowerCase()===detectedCity.toLowerCase()||o.textContent.toLowerCase()===detectedCity.toLowerCase());if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}cityEl.disabled=false;cityEl.value=detectedCity;}
+    if(cityEl){let opt=[...cityEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedCity)||normalizeText(o.textContent)===normalizeText(detectedCity));if(!opt){cityEl.innerHTML='';opt=document.createElement('option');opt.value=detectedCity;opt.textContent=detectedCity;cityEl.appendChild(opt);}cityEl.disabled=false;cityEl.value=detectedCity;}
     const stateEl=document.getElementById('customerState');
-    if(stateEl){let opt=[...stateEl.options].find(o=>o.value.toLowerCase()===detectedState.toLowerCase()||o.textContent.toLowerCase()===detectedState.toLowerCase());if(!opt&&/^delhi$/i.test(detectedState)){opt=[...stateEl.options].find(o=>/^delhi$/i.test(o.value));}if(opt)stateEl.value=opt.value;}
+    if(stateEl){let opt=[...stateEl.options].find(o=>normalizeText(o.value)===normalizeText(detectedState)||normalizeText(o.textContent)===normalizeText(detectedState));if(!opt&&/^delhi$/i.test(detectedState))opt=[...stateEl.options].find(o=>/^delhi$/i.test(o.value));if(opt)stateEl.value=opt.value;}
     pinLookup={pin,state:detectedState,cities:[detectedCity]};
-    setPinStatus('✓ GPS: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState+' · '+pin,'ok');
-    setLocationStatus('✓ Location detected. Add your house / flat / room number before ordering.','ok');
+    setPinStatus('✓ GPS suggests: '+(detectedLocality||detectedCity)+' · '+detectedCity+' · '+detectedState+' · '+pin+'. Please verify before ordering.','ok');
+    setLocationStatus('✓ Location detected. Enter your house / flat / street address and verify the PIN before ordering.','ok');
     refreshCheckoutStep();
   };
   try{
-    const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:20000,maximumAge:0}));
-    const accuracy=Number(pos?.coords?.accuracy||0);
-    // Do not silently turn an approximate Android/Chrome location into a wrong PIN/locality.
-    // Mukundpur and Jahangirpuri are close enough that coarse location can cross postal areas.
-    if(Number.isFinite(accuracy)&&accuracy>500){
-      throw new Error('Your phone is sharing an approximate location (±'+Math.round(accuracy)+' m). Turn ON Precise location for Chrome, then tap USE CURRENT LOCATION again.');
-    }
-    let d;
-    try{d=await reverseWithServer(pos);}catch(serverErr){console.warn('Server reverse geocode failed:',serverErr);d=await reverseWithBDC(pos);}
-    applyLocation(d);
+    const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:25000,maximumAge:0}));
+    const accuracy=Number(pos?.coords?.accuracy||Infinity);
+    if(!Number.isFinite(accuracy))throw new Error('Your phone did not report GPS accuracy. Turn ON Precise location for Chrome and try again.');
+    if(accuracy>50)throw new Error('Your GPS fix is only accurate to about '+Math.round(accuracy)+' m. Turn ON Precise location for Chrome and try again.');
+    const d=await reverseWithServer(pos);
+    applyLocation(d,accuracy);
   }catch(err){
     console.error('GPS location failed:',err);
     let msg='Could not detect your location. Please try again or enter the address manually.';

@@ -146,10 +146,14 @@ async function api(req,res,p){
      if(!first||first.Status!=='Success'||!Array.isArray(first.PostOffice)||!first.PostOffice.length)return send(res,404,{error:'PIN code not found'},'application/json',origin);
      const rows=first.PostOffice;
      const state=String(rows[0]?.State||'').trim();
-     const cities=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
+     const districts=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
      const blocks=[...new Set(rows.map(r=>String(r?.Block||'').trim()).filter(Boolean))];
-     const cityOptions=cities.length?cities:blocks;
-     return send(res,200,{pin,state,cities:cityOptions,postOffices:rows.map(r=>String(r?.Name||'').trim()).filter(Boolean)},'application/json',origin);
+     // Delhi's India Post records often expose an administrative district
+     // (e.g. South West Delhi / North West Delhi) as District. That is not
+     // the customer-facing City/Town. Keep Delhi as the city and expose the
+     // district separately for internal/order records.
+     const cityOptions=/^delhi$/i.test(state)?['Delhi']:(districts.length?districts:blocks);
+     return send(res,200,{pin,state,cities:cityOptions,districts,postOffices:rows.map(r=>String(r?.Name||'').trim()).filter(Boolean)},'application/json',origin);
    }catch(e){return send(res,502,{error:'PIN lookup service is temporarily unavailable'},'application/json',origin)}
   }
 

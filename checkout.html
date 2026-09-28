@@ -6,6 +6,7 @@
 <title>Checkout — YOUR TYPE</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
+<style>.fieldLabel{display:block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#888;margin:0 0 7px}.form select{width:100%;box-sizing:border-box;background:#090909;color:#fff;border:1px solid #242424;padding:14px 12px;font:inherit;min-height:48px}.form select:focus{outline:none;border-color:#777}.form select:disabled{opacity:.6;cursor:not-allowed}.pinStatus{font-size:10px;color:#777;line-height:1.5;margin:-3px 0 2px}.pinStatus.ok{color:#7ee787}.pinStatus.error{color:#ff8d8d}.pinStatus.loading{color:#aaa}</style>
 </head>
 <body>
 <div class="shipping"><div class="shipping-track"><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span><span>🔒 SECURE CHECKOUT</span><span>YOUR TYPE / PREMIUM STREETWEAR</span></div></div>
@@ -33,8 +34,20 @@
       <input id="customerEmail" required type="email" placeholder="Email address" autocomplete="email">
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
       <h3>Shipping / Billing Address</h3>
-      <input id="customerAddress" required placeholder="Full address" autocomplete="street-address">
-      <div class="two"><input id="customerCity" required placeholder="City" autocomplete="address-level2"><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="PIN code" autocomplete="postal-code"></div><input id="customerState" required placeholder="State (e.g. Haryana)" autocomplete="address-level1">
+      <label class="fieldLabel" for="customerAddress">Address</label>
+      <input id="customerAddress" required placeholder="House / Flat, Street, Area" autocomplete="street-address">
+      <div><label class="fieldLabel" for="customerPin">PIN code</label><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="postal-code" aria-describedby="pinStatus"></div>
+      <div id="pinStatus" class="pinStatus" aria-live="polite">Enter your 6-digit PIN code to detect City and State automatically.</div>
+      <div class="two">
+        <div><label class="fieldLabel" for="customerCity">City / Town</label><select id="customerCity" required autocomplete="address-level2" disabled><option value="" selected>Select city / town</option></select></div>
+        <div><label class="fieldLabel" for="customerState">State / Union Territory</label>
+          <select id="customerState" required autocomplete="address-level1">
+            <option value="" selected disabled>Select your state / UT</option>
+            <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option>
+            <option>Andaman and Nicobar Islands</option><option>Chandigarh</option><option>Dadra and Nagar Haveli and Daman and Diu</option><option>Delhi</option><option>Jammu and Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option>
+          </select>
+        </div>
+      </div>
       <h3>Payment method</h3>
       <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
@@ -162,6 +175,47 @@ else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[
 let subtotal=cart.reduce((s,p)=>s+priceOf(p)*Number(p.qty||1),0);
 let shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
 let discount=0,appliedCoupon=''; let total=subtotal+shipping;
+let pinLookup={pin:'',state:'',cities:[]};
+let pinLookupTimer=0;
+function setPinStatus(message,type=''){const el=document.getElementById('pinStatus');if(!el)return;el.textContent=message;el.className='pinStatus'+(type?' '+type:'');}
+function resetLocationFromPin(){
+  pinLookup={pin:'',state:'',cities:[]};
+  const city=document.getElementById('customerCity'),state=document.getElementById('customerState');
+  if(city){city.innerHTML='<option value="" selected>Select city / town</option>';city.value='';city.disabled=true;}
+  if(state)state.value='';
+  setPinStatus('Enter your 6-digit PIN code to detect City and State automatically.');
+}
+async function lookupPinCode(force=false){
+  const pin=String(document.getElementById('customerPin')?.value||'').replace(/\D/g,'').slice(0,6);
+  const pinEl=document.getElementById('customerPin');if(pinEl&&pinEl.value!==pin)pinEl.value=pin;
+  if(pin.length!==6){if(force||pin.length===0)resetLocationFromPin();return;}
+  if(!force&&pinLookup.pin===pin&&pinLookup.state)return;
+  clearTimeout(pinLookupTimer);setPinStatus('Detecting City and State from PIN…','loading');
+  const city=document.getElementById('customerCity'),state=document.getElementById('customerState');
+  try{
+    const r=await fetch('/api/pincode/'+encodeURIComponent(pin),{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'PIN code not found');
+    const cities=[...new Set((Array.isArray(d.cities)?d.cities:[]).map(v=>String(v).trim()).filter(Boolean))];
+    const detectedState=String(d.state||'').trim();
+    if(!detectedState||!cities.length)throw new Error('Location could not be detected for this PIN');
+    pinLookup={pin,state:detectedState,cities};
+    if(state){state.value=detectedState;}
+    if(city){city.innerHTML='<option value="" disabled>Select city / town</option>'+cities.map(v=>'<option value="'+escDetail(v)+'">'+escDetail(v)+'</option>').join('');city.disabled=false;city.value=cities[0];}
+    setPinStatus('✓ Auto-detected: '+cities.join(', ')+' · '+detectedState,'ok');
+    refreshCheckoutStep();
+  }catch(err){
+    pinLookup={pin:'',state:'',cities:[]};
+    if(city){city.innerHTML='<option value="" selected>Select city / town</option>';city.value='';city.disabled=true;}
+    if(state)state.value='';
+    setPinStatus(err.message||'Could not detect this PIN. Please check the PIN and try again.','error');
+    refreshCheckoutStep();
+  }
+}
+const pinInput=document.getElementById('customerPin');
+pinInput?.addEventListener('input',()=>{clearTimeout(pinLookupTimer);pinLookupTimer=setTimeout(()=>lookupPinCode(false),250);});
+pinInput?.addEventListener('blur',()=>lookupPinCode(true));
+
 async function initCheckout(){
   try{
     const [sr,pr]=await Promise.all([fetch('/api/site-config',{cache:'no-store'}),fetch('/api/products',{cache:'no-store'})]);
@@ -186,7 +240,7 @@ function setCheckoutStep(activeStep,doneUpto){
  });
 }
 function refreshCheckoutStep(){
- const addrFields=['customerName','customerEmail','customerPhone','customerAddress','customerCity','customerPin'];
+ const addrFields=['customerName','customerEmail','customerPhone','customerAddress','customerCity','customerState','customerPin'];
  const addressDone=addrFields.every(id=>(document.getElementById(id)?.value||'').trim().length>0);
  const paymentDone=Boolean(document.querySelector('input[name="pay"]:checked'));
  if(!addressDone)setCheckoutStep(2,1);
@@ -209,6 +263,12 @@ function showUPIPopup(){
 async function placeOrder(e){
  e.preventDefault(); if(!cart.length)return;
  const form=e.currentTarget; if(!form.reportValidity())return;
+ const currentPin=String(document.getElementById('customerPin')?.value||'').trim();
+ if(currentPin.length===6 && pinLookup.pin!==currentPin){await lookupPinCode(true);}
+ if(currentPin.length!==6 || pinLookup.pin!==currentPin || !pinLookup.state || !pinLookup.cities.length){alert('Please enter a valid 6-digit PIN so City and State can be detected.');return;}
+ const selectedCity=String(document.getElementById('customerCity')?.value||'').trim();
+ const selectedState=String(document.getElementById('customerState')?.value||'').trim();
+ if(!selectedCity||!selectedState){alert('Please select the detected City and State.');return;}
  const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), state=document.getElementById('customerState').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
  const payment=document.querySelector('input[name="pay"]:checked')?.value||'cod';
  const customerToken=localStorage.getItem('yourTypeCustomerToken')||'';

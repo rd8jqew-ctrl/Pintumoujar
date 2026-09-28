@@ -136,6 +136,23 @@ async function api(req,res,p){
   if(req.method==='GET'&&p==='/api/site-config')return send(res,200,{site:db.site,settings:{gst:Number(db.settings.gst||0),shipping:Number(db.settings.shipping||0),freeShipping:Number(db.settings.freeShipping||0)}},'application/json',origin);
   if(req.method==='PATCH'&&p==='/api/admin/site-config'){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const x=await body(req);if(x.hero!==undefined)db.site.hero=String(x.hero);if(x.announcement!==undefined)db.site.announcement=String(x.announcement);if(x.sections&&typeof x.sections==='object')db.site.sections=x.sections;if(x.sectionProducts&&typeof x.sectionProducts==='object'){const incoming={};Object.entries(x.sectionProducts).forEach(([section,ids])=>{if(!Array.isArray(ids))return;incoming[String(section)]=[...new Set(ids.map(v=>String(v)).filter(id=>db.products.some(prod=>String(prod.id)===id)))];});const current=db.site.sectionProducts&&typeof db.site.sectionProducts==='object'?db.site.sectionProducts:{};const merged={...current,...incoming};const touchedIds=new Set(Object.values(incoming).flat());Object.keys(merged).forEach(section=>{if(incoming[section]===undefined)return;merged[section]=incoming[section];});Object.keys(merged).forEach(section=>{if(!Array.isArray(merged[section]))merged[section]=[];merged[section]=[...new Set(merged[section].map(v=>String(v)).filter(id=>db.products.some(prod=>String(prod.id)===id)))];});if(touchedIds.size){Object.keys(merged).forEach(section=>{if(incoming[section]!==undefined)return;merged[section]=merged[section].filter(id=>!touchedIds.has(String(id)));});}db.site.sectionProducts=merged}if(Array.isArray(x.colorPalette))db.site.colorPalette=x.colorPalette.map(v=>String(v).trim()).filter(Boolean);audit('site.update');await saveAndFlush(db);return send(res,200,{ok:true,site:db.site},'application/json',origin)}
 
+  if(req.method==='GET'&&/^\/api\/pincode\/\d{6}$/.test(p)){
+   const pin=p.slice('/api/pincode/'.length);
+   try{
+     const rr=await fetch('https://api.postalpincode.in/pincode/'+encodeURIComponent(pin),{headers:{'User-Agent':'YOUR-TYPE/1.0'},signal:AbortSignal.timeout(6000)});
+     if(!rr.ok)throw new Error('PIN lookup failed');
+     const data=await rr.json();
+     const first=Array.isArray(data)&&data[0]?data[0]:null;
+     if(!first||first.Status!=='Success'||!Array.isArray(first.PostOffice)||!first.PostOffice.length)return send(res,404,{error:'PIN code not found'},'application/json',origin);
+     const rows=first.PostOffice;
+     const state=String(rows[0]?.State||'').trim();
+     const cities=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
+     const blocks=[...new Set(rows.map(r=>String(r?.Block||'').trim()).filter(Boolean))];
+     const cityOptions=cities.length?cities:blocks;
+     return send(res,200,{pin,state,cities:cityOptions,postOffices:rows.map(r=>String(r?.Name||'').trim()).filter(Boolean)},'application/json',origin);
+   }catch(e){return send(res,502,{error:'PIN lookup service is temporarily unavailable'},'application/json',origin)}
+  }
+
   if(req.method==='GET'&&p==='/api/products')return send(res,200,{products:db.products.filter(p=>p.active!==false).map(safeProduct)},'application/json',origin);
   if(req.method==='GET'&&p.startsWith('/api/reviews/')){const name=decodeURIComponent(p.slice('/api/reviews/'.length));return send(res,200,{reviews:db.reviews.filter(r=>r.product===name&&r.status!=='rejected').slice(-50).reverse()},'application/json',origin)}
   if(req.method==='POST'&&p==='/api/reviews'){const x=await body(req),name=String(x.product||'').trim(),title=String(x.title||'').trim(),text=String(x.text||'').trim(),rating=Math.max(1,Math.min(5,Math.floor(Number(x.rating||5))));const s=auth(req,'customer');if(!name||!title||!text||text.length>800)return send(res,400,{error:'Product, title and review text are required'},'application/json',origin);if(!s)return send(res,401,{error:'Please sign in to review'},'application/json',origin);const verified=db.orders.some(o=>o.userId===s.userId&&o.status!=='Cancelled'&&o.items?.some(it=>it.name===name));const u=db.users.find(v=>v.id===s.userId);const r={id:crypto.randomUUID(),product:name,rating,title,text,name:u?.name||'Customer',verified,status:'pending',reply:'',createdAt:new Date().toISOString()};db.reviews.push(r);audit('review.create',{id:r.id});await saveAndFlush(db);return send(res,201,{ok:true,review:r},'application/json',origin)}
@@ -161,6 +178,34 @@ async function api(req,res,p){
      }
    }
    const customerState=String(x.state||x.customerState||'').trim();
+   const customerCity=String(x.city||'').trim();
+   // Re-validate the customer's PIN -> State/City on the server. Never trust the
+   // values selected in the browser because the browser can be modified.
+   if(!customerState||!customerCity)return send(res,400,{error:'State and City are required'},'application/json',origin);
+   try{
+     const rr=await fetch('https://api.postalpincode.in/pincode/'+encodeURIComponent(String(x.pin)),{headers:{'User-Agent':'YOUR-TYPE/1.0'},signal:AbortSignal.timeout(6000)});
+     if(!rr.ok)throw new Error('PIN lookup failed');
+     const pdata=await rr.json();
+     const first=Array.isArray(pdata)&&pdata[0]?pdata[0]:null;
+     if(!first||first.Status!=='Success'||!Array.isArray(first.PostOffice)||!first.PostOffice.length)return send(res,400,{error:'PIN code could not be verified. Please check the PIN.'},'application/json',origin);
+     const rows=first.PostOffice;
+     const normalizeState=v=>String(v||'').toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim();
+     const stateAliases={
+       'nct of delhi':'delhi','national capital territory of delhi':'delhi',
+       'orissa':'odisha','pondicherry':'puducherry','uttaranchal':'uttarakhand',
+       'andaman and nicobar':'andaman and nicobar islands','andaman nicobar islands':'andaman and nicobar islands',
+       'dadra and nagar haveli':'dadra and nagar haveli and daman and diu','daman and diu':'dadra and nagar haveli and daman and diu'
+     };
+     const stateKey=v=>stateAliases[normalizeState(v)]||normalizeState(v);
+     const detectedState=String(rows[0]?.State||'').trim();
+     const detectedStateKey=stateKey(detectedState), selectedStateKey=stateKey(customerState);
+     if(!detectedStateKey||detectedStateKey!==selectedStateKey)return send(res,400,{error:'The selected State does not match the PIN code. Please use the detected State.'},'application/json',origin);
+     const allowedCities=[...new Set(rows.map(r=>String(r?.District||'').trim()).filter(Boolean))];
+     const allowedBlocks=[...new Set(rows.map(r=>String(r?.Block||'').trim()).filter(Boolean))];
+     const cityPool=allowedCities.length?allowedCities:allowedBlocks;
+     const cityKey=v=>normalizeState(v);
+     if(!cityPool.some(v=>cityKey(v)===cityKey(customerCity)))return send(res,400,{error:'The selected City does not match the PIN code. Please use the detected City.'},'application/json',origin);
+   }catch(e){return send(res,503,{error:'PIN verification is temporarily unavailable. Please try again.'},'application/json',origin)}
    const sellerState=String(db.settings.sellerState||'').trim();
    // Seller state is needed to split GST into CGST/SGST vs IGST, but it must not
    // block a customer from placing an otherwise valid order. Keep the GST amount
@@ -178,7 +223,7 @@ async function api(req,res,p){
    const igst=taxSplitConfigured&&interstate?gst:0;
    const total=Math.round((subtotal-discount+shipping+(gstInclusive?0:gst))*100)/100;
    const uniqueRates=[...new Set(rates)].sort((a,b)=>a-b), gstRate=uniqueRates.length===1?uniqueRates[0]:0;
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:customerState,pin:String(x.pin),placeOfSupply:customerState,sellerState,taxSplitConfigured,taxSplitStatus:taxSplitConfigured?(interstate?'IGST':'CGST_SGST'):'PENDING_SELLER_STATE',items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:'',idempotencyKey:idem||''};
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:customerCity,state:customerState,pin:String(x.pin),placeOfSupply:customerState,sellerState,taxSplitConfigured,taxSplitStatus:taxSplitConfigured?(interstate?'IGST':'CGST_SGST'):'PENDING_SELLER_STATE',items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:'',idempotencyKey:idem||''};
    db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,taxSplitConfigured,items:requested},'application/json',origin);
   }
   if(req.method==='GET'&&p.startsWith('/api/orders/')&&!p.endsWith('/track')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,subtotal:o.subtotal,discount:o.discount,shipping:o.shipping,taxableSubtotal:o.taxableSubtotal,gstRate:o.gstRate,gst:o.gst,gstInclusive:o.gstInclusive,cgst:o.cgst||0,sgst:o.sgst||0,igst:o.igst||0,taxSplitConfigured:o.taxSplitConfigured!==false,taxSplitStatus:o.taxSplitStatus||'',name:o.name||o.customer||'',customer:o.customer||o.name||'',phone:o.phone||'',email:o.email||'',state:o.state||'',city:o.city||'',pin:o.pin||'',address:o.address||'',payment:o.payment||'cod',coupon:o.coupon||'',awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',verified:o.verified!==false,items:Array.isArray(o.items)?o.items:[]},'application/json',origin)}

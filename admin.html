@@ -1749,9 +1749,32 @@ async function restoreServerBackup(){
   /* ---------- output ---------- */
   const SPEC={slip:{w:210,h:297,px:1123,page:'A4'},invoice:{w:210,h:297,px:1123,page:'A4'},label:{w:101.6,h:152.4,px:576,page:'4in 6in'}};
   const stamp=(o,k)=>{const f=k==='label'?'labelPrints':'slipPrints';o[f]=(o[f]||0)+1};
+  /* ---- server sync (database): options, slip settings and print counts live on the server ---- */
+  const oKey=o=>o.serverOrderId||o.orderId||o.id;
+  async function sapi(path,method,body){
+    const r=await fetch(path,{method:method||'GET',headers:adminHeaders(),body:body?JSON.stringify(body):undefined});
+    let j={};try{j=await r.json()}catch(_){}
+    if(!r.ok)throw new Error(j.error||('Server error '+r.status));
+    return j;
+  }
+  async function pull(){
+    try{
+      const d=await sapi('/api/admin/slip-data');
+      state.settings=state.settings||{};
+      if(d.settings&&Object.keys(d.settings).length)state.settings.slip=Object.assign({},state.settings.slip||{},d.settings);
+      (state.orders||[]).forEach(o=>{const x=(d.orders||{})[oKey(o)];if(x)Object.assign(o,x)});
+      save();return true;
+    }catch(e){console.warn('slip data not loaded from server:',e.message);return false}
+  }
+  async function afterPrint(orders,kind){
+    orders.forEach(o=>stamp(o,kind));
+    try{const r=await sapi('/api/admin/slip-print','POST',{ids:orders.map(oKey),kind});
+      orders.forEach(o=>{const c=(r.counts||{})[oKey(o)];if(c){o.slipPrints=c.slipPrints;o.labelPrints=c.labelPrints}})}catch(e){console.warn('print count not saved on server:',e.message)}
+    save();
+  }
   async function build(o,kind,opt){return kind==='label'?labelHtml(o,opt):slipHtml(o,kind,opt)}
   async function generate(ids,kind,opt){
-    ids=[].concat(ids);const orders=ids.map(findOrder).filter(Boolean);
+    await pull();ids=[].concat(ids);const orders=ids.map(findOrder).filter(Boolean);
     if(!orders.length){toast('Order not found');return}
     toast('Preparing PDF…');loadFont();
     const sp=SPEC[kind],fname='YOUR_TYPE_'+({slip:'PACKING_SLIP_',invoice:'INVOICE_',label:'LABEL_'}[kind])+(orders.length>1?'BULK_'+orders.length:safeFile(oid(orders[0])));
@@ -1772,7 +1795,7 @@ async function restoreServerBackup(){
         pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',(sp.w-w)/2,0,w,h);
       }
       host.remove();step='save';pdf.save(fname+'.pdf');
-      orders.forEach(o=>stamp(o,kind));save();toast((orders.length>1?orders.length+' PDFs':'PDF')+' downloaded');
+      await afterPrint(orders,kind);toast((orders.length>1?orders.length+' PDFs':'PDF')+' downloaded');
     }catch(e){
       console.error('PDF failed at '+step,e);
       try{
@@ -1780,7 +1803,7 @@ async function restoreServerBackup(){
         const w=window.open('','_blank');if(!w){toast('Popup blocked - allow popups (error: '+step+')');return}
         const pr=kind==='label'?'@page{size:4in 6in;margin:0}.lb{page-break-after:always}':'@page{size:A4;margin:0}.ys{width:100%!important;min-height:1040px;page-break-after:always}';
         w.document.write('<!doctype html><meta name="viewport" content="width=device-width"><title>'+fname+'</title><link href="'+FONT+'" rel="stylesheet"><style>body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+pr+CSS+'</style>'+htmls.join('')+'<script>setTimeout(function(){document.querySelectorAll(".ys").forEach(function(n){var H=1040;if(n.scrollHeight>H)n.style.zoom=H/n.scrollHeight});print()},900)<\/script>');
-        w.document.close();orders.forEach(o=>stamp(o,kind));save();toast('Print view opened - Save as PDF (reason: '+step+': '+(e&&e.message||e)+')');
+        w.document.close();await afterPrint(orders,kind);toast('Print view opened - Save as PDF (reason: '+step+': '+(e&&e.message||e)+')');
       }catch(err){console.error(err);toast('Unable to create PDF')}
     }
   }
@@ -1788,7 +1811,7 @@ async function restoreServerBackup(){
   /* ---------- preview ---------- */
   let pv={};
   async function preview(id,kind,lang){
-    const o=findOrder(id);if(!o)return;pv={id,kind,lang};loadFont();toast('Loading preview…');
+    await pull();const o=findOrder(id);if(!o)return;pv={id,kind,lang};loadFont();toast('Loading preview…');
     const h=await build(o,kind,{lang}),sp=SPEC[kind],pw=kind==='label'?384:794,z=Math.min(1,(window.innerWidth-56)/pw);
     const cnt=(o.slipPrints||0),lc=(o.labelPrints||0),q=String(id).replace(/'/g,"\\'");
     openModal(`<h3 style="margin-bottom:8px">Preview - ${kind==='label'?'Shipping Label 4x6':kind==='invoice'?'Invoice':'Packing Slip'}</h3>
@@ -1798,8 +1821,8 @@ async function restoreServerBackup(){
   }
 
   /* ---------- order options ---------- */
-  function orderOpts(id){
-    const o=findOrder(id);if(!o)return;const q=String(id).replace(/'/g,"\\'"),ck=v=>v?'checked':'';
+  async function orderOpts(id){
+    await pull();const o=findOrder(id);if(!o)return;const q=String(id).replace(/'/g,"\\'"),ck=v=>v?'checked':'';
     openModal(`<h3>Slip Options - ${E(oid(o))}</h3><p class="muted">Ye sirf is order ki slip par lagega.</p>
 <label><input type=checkbox id=soGift ${ck(o.gift)}> Gift order (slip par price chhupao)</label><br>
 <label><input type=checkbox id=soFrag ${ck(o.fragile)}> Fragile - sambhal ke pack karo</label><br>
@@ -1811,15 +1834,17 @@ async function restoreServerBackup(){
 <p class="muted">Slips printed: ${o.slipPrints||0} · Labels printed: ${o.labelPrints||0}</p>
 <button class="btn primary" onclick="ytSaveOpts('${q}')">Save</button>`);
   }
-  function saveOpts(id){
+  async function saveOpts(id){
     const o=findOrder(id),g=x=>document.getElementById(x);if(!o)return;
     o.gift=g('soGift').checked;o.fragile=g('soFrag').checked;o.hidePrice=g('soHide').checked;o.giftMessage=g('soGm').value.trim();o.note=g('soNote').value.trim();o.weight=g('soWt').value.trim();o.slipLang=g('soLang').value;
-    save();closeModal();toast('Slip options saved');
+    save();closeModal();
+    try{await sapi('/api/admin/orders/'+encodeURIComponent(oKey(o)),'PATCH',{gift:o.gift,fragile:o.fragile,hidePrice:o.hidePrice,giftMessage:o.giftMessage,note:o.note,weight:o.weight,slipLang:o.slipLang});toast('Slip options saved (database)')}
+    catch(e){toast('Saved on this device only: '+e.message)}
   }
 
   /* ---------- store slip settings ---------- */
-  function settingsModal(){
-    const S=SL(),f=(k,ph,v)=>`<input id="ss_${k}" placeholder="${ph}" value="${E(v)}"><br><br>`;
+  async function settingsModal(){
+    await pull();const S=SL(),f=(k,ph,v)=>`<input id="ss_${k}" placeholder="${ph}" value="${E(v)}"><br><br>`;
     openModal(`<h3>Slip Settings</h3><p class="muted">Ye sab packing slip, invoice aur label par aayega.</p>
 ${f('name','Store name',S.name)}${f('gstin','GSTIN',S.gstin)}${f('address','Return address',S.address)}${f('phone','Support phone',S.phone)}${f('email','Support email',S.email)}
 <textarea id="ss_policy" rows=3 style="width:100%" placeholder="Return policy text">${E(S.policy)}</textarea><br><br>
@@ -1836,7 +1861,9 @@ ${f('returnUrl','Return page link ({id} = order id). Khali = QR nahi',S.returnUr
     n.badges=g('ss_badges').checked;if(g('ss_rmlogo')&&g('ss_rmlogo').checked)n.logo='';
     const fl=g('ss_logo').files[0];
     if(fl){n.logo=await new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,400/im.width),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/png'))};im.onerror=()=>res(n.logo);im.src=r.result};r.onerror=()=>res(n.logo);r.readAsDataURL(fl)})}
-    state.settings=state.settings||{};state.settings.slip=n;save();closeModal();toast('Slip settings saved');
+    state.settings=state.settings||{};state.settings.slip=n;save();closeModal();
+    try{await sapi('/api/admin/slip-settings','PATCH',n);toast('Slip settings saved (database)')}
+    catch(e){toast('Saved on this device only: '+e.message)}
   }
 
   /* ---------- selection + bulk ---------- */

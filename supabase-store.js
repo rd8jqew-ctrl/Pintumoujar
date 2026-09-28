@@ -144,6 +144,10 @@ async function hydrateDb(db, options={}){
     db.audit = audit.map(a=>({id:a.id,action:a.action,meta:a.meta||{},time:a.created_at}));
     if(siteRows[0]){ const s=siteRows[0]; db.site={hero:s.hero,announcement:s.announcement,sections:s.sections||{},sectionProducts:s.section_products||{},colorPalette:s.color_palette||[],store:s.store||{},content:s.content||{},categories:s.categories||[]}; }
     if(settingsRows[0]){ const s=settingsRows[0]; db.settings={gst:Number(s.gst||0),shipping:Number(s.shipping||0),freeShipping:Number(s.free_shipping||0),gateway:s.gateway||{},courier:s.courier||{},notifications:s.notifications||{},role:s.role||'Super Admin'}; }
+    try{ // optional table: never blocks startup if it does not exist yet
+      const sd=await getAllOptional('slip_data','updated_at');
+      if(sd.length){db.slip={settings:{},orders:{}};for(const r of sd){const k=String(r.key||'');if(k==='settings')db.slip.settings=r.data||{};else if(k.startsWith('o:'))db.slip.orders[k.slice(2)]=r.data||{}}}
+    }catch(e){console.warn('[Supabase] slip_data not loaded:',cleanError(e))}
     db.deletedProductIds = [...new Set([...(options.preserveDeletedIds||[]).map(String),...deleted.map(x=>String(x.product_id))])];
     db.sessions = {};
     lastSync = new Date().toISOString(); lastError = null;
@@ -207,6 +211,12 @@ async function persistDb(db, initial=false){
   await replaceTable('products',productRows,'id');
   await replaceTable('customers',customerRows,'id');
   await replaceTable('orders',orderRows,'order_id');
+  try{ // optional table: a problem here must never break saving of orders/products
+    const sl=d.slip||{},slipRows=[];
+    if(sl.settings&&Object.keys(sl.settings).length)slipRows.push({key:'settings',data:sl.settings});
+    for(const id of Object.keys(sl.orders||{}))slipRows.push({key:'o:'+id,data:sl.orders[id]||{}});
+    if(slipRows.length)await replaceTable('slip_data',slipRows,'key');
+  }catch(e){console.warn('[Supabase] slip_data save skipped:',cleanError(e))}
   if(!disabledTables.has('order_items')){
     try{
       await request('order_items','DELETE',null,'order_id=not.is.null');

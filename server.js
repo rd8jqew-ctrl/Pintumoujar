@@ -143,7 +143,7 @@ async function api(req,res,p){
   if(req.method==='POST'&&p==='/api/orders'){
    const x=await body(req);if(!x.name||!x.email||!x.phone||!x.address||!x.pin||!Array.isArray(x.items)||!x.items.length||!/^\d{6}$/.test(String(x.pin)))return send(res,400,{error:'Complete shipping details and cart are required'},'application/json',origin);
    const idem=String(req.headers['x-idempotency-key']||x.idempotencyKey||'').trim();
-   if(idem){const prior=db.orders.find(o=>o.idempotencyKey===idem);if(prior)return send(res,200,{orderId:prior.orderId,total:prior.total,gst:prior.gst,taxableSubtotal:prior.taxableSubtotal,cgst:prior.cgst||0,sgst:prior.sgst||0,igst:prior.igst||0,duplicate:true},'application/json',origin)}
+   if(idem){const prior=db.orders.find(o=>o.idempotencyKey===idem);if(prior)return send(res,200,{orderId:prior.orderId,total:prior.total,gst:prior.gst,taxableSubtotal:prior.taxableSubtotal,cgst:prior.cgst||0,sgst:prior.sgst||0,igst:prior.igst||0,taxSplitConfigured:prior.taxSplitConfigured!==false,taxSplitStatus:prior.taxSplitStatus||'',duplicate:true},'application/json',origin)}
    const requested=[],reserved=new Map();
    for(const item of x.items){const pr=findProduct(item);if(!pr||pr.active===false)return send(res,400,{error:'Product no longer available: '+String(item.name||item.productId||'')},'application/json',origin);const size=SIZES.includes(String(item.size))?String(item.size):'M';const qty=Math.min(99,Math.max(1,Math.floor(Number(item.qty||1))));const key=pr.id+'|'+size;const already=reserved.get(key)||0;const available=Number(pr.sizes?.[size]||0)-already;if(available<qty)return send(res,409,{error:`${pr.name} size ${size} is out of stock`},'application/json',origin);reserved.set(key,already+qty);requested.push({productId:pr.id,name:pr.name,image:pr.image,sku:pr.sku||'',hsn:String(pr.hsn||''),gstRate:Math.max(0,Math.min(100,Number(pr.gstRate??db.settings.gst??5)||0)),price:priceNumber(pr.price),size,color:String(item.color||'Black'),qty});}
    for(const [key,qty] of reserved){const [id,size]=key.split('|');const pr=db.products.find(v=>v.id===id);pr.sizes[size]=Math.max(0,Number(pr.sizes[size]||0)-qty)}
@@ -162,21 +162,26 @@ async function api(req,res,p){
    }
    const customerState=String(x.state||x.customerState||'').trim();
    const sellerState=String(db.settings.sellerState||'').trim();
-   if(!sellerState&&Number(db.settings.gst||5)>0)return send(res,400,{error:'Seller / business State must be configured in GST settings before placing taxable orders'},'application/json',origin);
+   // Seller state is needed to split GST into CGST/SGST vs IGST, but it must not
+   // block a customer from placing an otherwise valid order. Keep the GST amount
+   // authoritative and mark the split as pending until the seller state is set.
+   const taxSplitConfigured=Boolean(sellerState&&customerState);
    const gstInclusive=x.gstInclusive!==false && x.gstIncluded!==false;
    const discountFactor=subtotal>0?Math.max(0,1-(discount/subtotal)):0;
    let gst=0,taxableSubtotal=0;
    const rates=[];
    for(const it of requested){const gross=priceNumber(it.price)*Math.max(1,it.qty)*discountFactor;const rate=Math.max(0,Math.min(100,Number(it.gstRate)||0));rates.push(rate);const lineGst=gstInclusive?gross*rate/(100+rate):gross*rate/100;gst+=lineGst;taxableSubtotal+=gstInclusive?gross-lineGst:gross;}
    gst=Math.round(gst*100)/100;taxableSubtotal=Math.round(taxableSubtotal*100)/100;
-   const interstate=Boolean(sellerState&&customerState&&sellerState.toLowerCase()!==customerState.toLowerCase());
-   const cgst=interstate?0:Math.round(gst/2*100)/100, sgst=interstate?0:Math.round((gst-cgst)*100)/100, igst=interstate?gst:0;
+   const interstate=taxSplitConfigured && sellerState.toLowerCase()!==customerState.toLowerCase();
+   const cgst=taxSplitConfigured&&!interstate?Math.round(gst/2*100)/100:0;
+   const sgst=taxSplitConfigured&&!interstate?Math.round((gst-cgst)*100)/100:0;
+   const igst=taxSplitConfigured&&interstate?gst:0;
    const total=Math.round((subtotal-discount+shipping+(gstInclusive?0:gst))*100)/100;
    const uniqueRates=[...new Set(rates)].sort((a,b)=>a-b), gstRate=uniqueRates.length===1?uniqueRates[0]:0;
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:customerState,pin:String(x.pin),placeOfSupply:customerState,sellerState,items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:'',idempotencyKey:idem||''};
-   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,items:requested},'application/json',origin);
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:customerState,pin:String(x.pin),placeOfSupply:customerState,sellerState,taxSplitConfigured,taxSplitStatus:taxSplitConfigured?(interstate?'IGST':'CGST_SGST'):'PENDING_SELLER_STATE',items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:'',idempotencyKey:idem||''};
+   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,taxSplitConfigured,taxSplitStatus:taxSplitConfigured?(interstate?'IGST':'CGST_SGST'):'PENDING_SELLER_STATE',items:requested},'application/json',origin);
   }
-  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,subtotal:o.subtotal,discount:o.discount,shipping:o.shipping,taxableSubtotal:o.taxableSubtotal,gstRate:o.gstRate,gst:o.gst,gstInclusive:o.gstInclusive,cgst:o.cgst||0,sgst:o.sgst||0,igst:o.igst||0,name:o.name||o.customer||'',customer:o.customer||o.name||'',phone:o.phone||'',email:o.email||'',state:o.state||'',city:o.city||'',pin:o.pin||'',address:o.address||'',payment:o.payment||'cod',coupon:o.coupon||'',items:Array.isArray(o.items)?o.items:[]},'application/json',origin)}
+  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,subtotal:o.subtotal,discount:o.discount,shipping:o.shipping,taxableSubtotal:o.taxableSubtotal,gstRate:o.gstRate,gst:o.gst,gstInclusive:o.gstInclusive,cgst:o.cgst||0,sgst:o.sgst||0,igst:o.igst||0,taxSplitConfigured:o.taxSplitConfigured!==false,taxSplitStatus:o.taxSplitStatus||'',name:o.name||o.customer||'',customer:o.customer||o.name||'',phone:o.phone||'',email:o.email||'',state:o.state||'',city:o.city||'',pin:o.pin||'',address:o.address||'',payment:o.payment||'cod',coupon:o.coupon||'',items:Array.isArray(o.items)?o.items:[]},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/music/current'){
     const m=db.music||{};

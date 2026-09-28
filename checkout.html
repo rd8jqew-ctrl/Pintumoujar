@@ -34,7 +34,7 @@
       <input id="customerPhone" required type="tel" inputmode="tel" placeholder="Phone number" autocomplete="tel">
       <h3>Shipping / Billing Address</h3>
       <input id="customerAddress" required placeholder="Full address" autocomplete="street-address">
-      <div class="two"><input id="customerCity" required placeholder="City" autocomplete="address-level2"><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="PIN code" autocomplete="postal-code"></div>
+      <div class="two"><input id="customerCity" required placeholder="City" autocomplete="address-level2"><input id="customerPin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="PIN code" autocomplete="postal-code"></div><input id="customerState" required placeholder="State (e.g. Haryana)" autocomplete="address-level1">
       <h3>Payment method</h3>
       <label><input type="radio" name="pay" value="upi" onchange="showUPIPopup()"> UPI</label>
       <label><input type="radio" name="pay" value="cod" checked> Cash on Delivery</label>
@@ -49,6 +49,7 @@
       <div><span>Subtotal</span><b id="sumSubtotal">₹0</b></div>
       <div id="sumDiscountRow" style="display:none"><span id="sumDiscountLabel">Discount</span><b id="sumDiscount" style="color:#7ee787">-₹0</b></div>
       <div><span>Shipping</span><b id="sumShipping">₹0</b></div>
+      <div id="sumGstRow" style="display:none"><span>GST included</span><b id="sumGst">₹0</b></div>
       <div class="total"><span>Total</span><b id="sumTotal">₹0</b></div>
     </div>
   </aside>
@@ -160,17 +161,18 @@ function showUPIPopup(){
 async function placeOrder(e){
  e.preventDefault(); if(!cart.length)return;
  const form=e.currentTarget; if(!form.reportValidity())return;
- const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
+ const name=document.getElementById('customerName').value.trim(), city=document.getElementById('customerCity').value.trim(), state=document.getElementById('customerState').value.trim(), pin=document.getElementById('customerPin').value.trim(), address=document.getElementById('customerAddress').value.trim(), phone=document.getElementById('customerPhone').value.trim(), email=document.getElementById('customerEmail').value.trim();
  const payment=document.querySelector('input[name="pay"]:checked')?.value||'cod';
  const customerToken=localStorage.getItem('yourTypeCustomerToken')||'';
- const purchase={name,city,pin,address,phone,email,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
+ const idem=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('yt-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+ const purchase={name,city,state,pin,address,phone,email,idempotencyKey:idem,coupon:appliedCoupon,discount,items:cart.map(p=>({name:p[0],image:p[2],price:p[1],size:p.size||'M',color:p.color||'Black',qty:Number(p.qty||1)})),subtotal,shipping,total,payment};
  const btn=form.querySelector('button[type="submit"]'); if(btn)btn.disabled=true;
- try{const headers={'Content-Type':'application/json'}; if(customerToken)headers.Authorization='Bearer '+customerToken;
+ try{const headers={'Content-Type':'application/json','X-Idempotency-Key':idem}; if(customerToken)headers.Authorization='Bearer '+customerToken;
   const r=await fetch('/api/orders',{method:'POST',headers,body:JSON.stringify(purchase)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not place order');
   const finalTotal=Number.isFinite(Number(d.total))?Number(d.total):total;
-  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal;
+  purchase.orderId=d.orderId; purchase.date=new Date().toISOString(); purchase.total=finalTotal; purchase.taxableSubtotal=Number(d.taxableSubtotal||0); purchase.gst=Number(d.gst||0); purchase.gstRate=Number(d.gstRate||0); purchase.cgst=Number(d.cgst||0); purchase.sgst=Number(d.sgst||0); purchase.igst=Number(d.igst||0);
   localStorage.setItem('yourTypeLastPurchase',JSON.stringify(purchase));localStorage.setItem('yourTypeLastOrder',JSON.stringify(purchase));localStorage.removeItem('yourTypeCart');
-  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
+  document.getElementById('doneOrderId').textContent=d.orderId;document.getElementById('doneTotal').textContent=money(finalTotal);const gstEl=document.getElementById('sumGst');const gstRow=document.getElementById('sumGstRow');if(gstEl&&gstRow){gstEl.textContent=money(Number(d.gst||0));gstRow.style.display=Number(d.gst||0)>0?'':'none';}document.getElementById('orderModal').classList.add('isOpen');document.getElementById('orderModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';setCheckoutStep(4,4);
  }catch(err){alert(err.message)}finally{if(btn)btn.disabled=false}
 }
 

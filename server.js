@@ -54,7 +54,8 @@ async function saveAndFlush(db){
 }
 const db=load();
 db.orders ||= []; db.newsletter ||= []; db.users ||= []; db.products ||= []; db.sessions ||= {}; db.reviews ||= []; db.coupons ||= []; db.returns ||= []; db.notifications ||= []; db.audit ||= [];
-db.settings ||= {gst:5,shipping:99,freeShipping:1999};
+db.settings ||= {gst:5,shipping:99,freeShipping:1999,sellerState:''};
+db.settings.sellerState ||= db.settings.businessState || db.settings.state || '';
 db.music ||= {active:false,videoId:'',title:'',channel:'',thumbnail:'',duration:'',updatedAt:null};
 db.site ||= {hero:'YOUR TYPE',announcement:'New drops every week',sections:{home:true,collections:true,motion:true,featured:true,bestSellers:true,newCollection:true,trending:true,womenTops:true,highlights:true,editorial:true,newsletter:true},sectionProducts:{},colorPalette:['Black','White','Charcoal','Red','Blue','Green']};
 db.site.sections ||= {home:true,collections:true,motion:true,featured:true,bestSellers:true,newCollection:true,trending:true,womenTops:true,highlights:true,editorial:true,newsletter:true};
@@ -80,7 +81,7 @@ function orderId(){return 'YT-'+Date.now().toString(36).toUpperCase()+'-'+crypto
 function priceNumber(v){return Number(String(v??'').replace(/[^0-9.-]/g,''))||0}
 function cleanSizes(z){const src=z||{};return Object.fromEntries(SIZES.map(s=>[s,Math.max(0,Math.floor(Number(src[s]||0)))]))}
 function normalizeImageRef(v){const s=String(v||'').trim();if(!s)return '';if(/^data:|^https?:|^\//i.test(s))return s;if(/^uploads\//i.test(s))return '/'+s;if(/^photos\//i.test(s))return '/'+s;const localUpload=path.join(UPLOADS,path.basename(s));if(fs.existsSync(localUpload))return '/uploads/'+encodeURIComponent(path.basename(s));return '/uploads/'+encodeURIComponent(s)}
-function safeProduct(p){const sizes=cleanSizes(p.sizes),images=(Array.isArray(p.images)?p.images:[]).map(normalizeImageRef).filter(Boolean),image=normalizeImageRef(p.image||images[0]||'');return {id:String(p.id),name:String(p.name||''),price:String(p.price||''),image,images:images.length?images:(image?[image]:[]),badge:String(p.badge||''),oldPrice:String(p.oldPrice||''),description:String(p.description||''),category:String(p.category||'T-Shirts'),sku:String(p.sku||''),cost:Number(p.cost||0),sizes,colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],active:p.active!==false,featured:Boolean(p.featured),sections:Array.isArray(p.sections)?p.sections:[],stock:Object.values(sizes).reduce((a,b)=>a+b,0)}}
+function safeProduct(p){const sizes=cleanSizes(p.sizes),images=(Array.isArray(p.images)?p.images:[]).map(normalizeImageRef).filter(Boolean),image=normalizeImageRef(p.image||images[0]||'');return {id:String(p.id),name:String(p.name||''),price:String(p.price||''),gstRate:Math.max(0,Math.min(100,Number(p.gstRate??db.settings.gst??5)||0)),hsn:String(p.hsn||''),image,images:images.length?images:(image?[image]:[]),badge:String(p.badge||''),oldPrice:String(p.oldPrice||''),description:String(p.description||''),category:String(p.category||'T-Shirts'),sku:String(p.sku||''),cost:Number(p.cost||0),sizes,colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],active:p.active!==false,featured:Boolean(p.featured),sections:Array.isArray(p.sections)?p.sections:[],stock:Object.values(sizes).reduce((a,b)=>a+b,0)}}
 db.slip ||= {settings:{},orders:{}}; db.slip.settings ||= {}; db.slip.orders ||= {};
 const SLIP_BOOL=['gift','fragile','hidePrice'],SLIP_STR={giftMessage:300,note:500,weight:40};
 const SLIP_SET={name:80,gstin:20,address:300,phone:30,email:120,policy:400,promo:160,social:80,returnUrl:300,trackUrl:300};
@@ -141,8 +142,10 @@ async function api(req,res,p){
 
   if(req.method==='POST'&&p==='/api/orders'){
    const x=await body(req);if(!x.name||!x.email||!x.phone||!x.address||!x.pin||!Array.isArray(x.items)||!x.items.length||!/^\d{6}$/.test(String(x.pin)))return send(res,400,{error:'Complete shipping details and cart are required'},'application/json',origin);
+   const idem=String(req.headers['x-idempotency-key']||x.idempotencyKey||'').trim();
+   if(idem){const prior=db.orders.find(o=>o.idempotencyKey===idem);if(prior)return send(res,200,{orderId:prior.orderId,total:prior.total,gst:prior.gst,taxableSubtotal:prior.taxableSubtotal,cgst:prior.cgst||0,sgst:prior.sgst||0,igst:prior.igst||0,duplicate:true},'application/json',origin)}
    const requested=[],reserved=new Map();
-   for(const item of x.items){const pr=findProduct(item);if(!pr||pr.active===false)return send(res,400,{error:'Product no longer available: '+String(item.name||item.productId||'')},'application/json',origin);const size=SIZES.includes(String(item.size))?String(item.size):'M';const qty=Math.min(99,Math.max(1,Math.floor(Number(item.qty||1))));const key=pr.id+'|'+size;const already=reserved.get(key)||0;const available=Number(pr.sizes?.[size]||0)-already;if(available<qty)return send(res,409,{error:`${pr.name} size ${size} is out of stock`},'application/json',origin);reserved.set(key,already+qty);requested.push({productId:pr.id,name:pr.name,image:pr.image,sku:pr.sku||'',price:pr.price,size,color:String(item.color||'Black'),qty});}
+   for(const item of x.items){const pr=findProduct(item);if(!pr||pr.active===false)return send(res,400,{error:'Product no longer available: '+String(item.name||item.productId||'')},'application/json',origin);const size=SIZES.includes(String(item.size))?String(item.size):'M';const qty=Math.min(99,Math.max(1,Math.floor(Number(item.qty||1))));const key=pr.id+'|'+size;const already=reserved.get(key)||0;const available=Number(pr.sizes?.[size]||0)-already;if(available<qty)return send(res,409,{error:`${pr.name} size ${size} is out of stock`},'application/json',origin);reserved.set(key,already+qty);requested.push({productId:pr.id,name:pr.name,image:pr.image,sku:pr.sku||'',hsn:String(pr.hsn||''),gstRate:Math.max(0,Math.min(100,Number(pr.gstRate??db.settings.gst??5)||0)),price:priceNumber(pr.price),size,color:String(item.color||'Black'),qty});}
    for(const [key,qty] of reserved){const [id,size]=key.split('|');const pr=db.products.find(v=>v.id===id);pr.sizes[size]=Math.max(0,Number(pr.sizes[size]||0)-qty)}
    const customer=auth(req,'customer'),subtotal=requested.reduce((sum,it)=>sum+priceNumber(it.price)*it.qty,0),shipping=subtotal>=Number(db.settings.freeShipping||1999)?0:Number(db.settings.shipping||99),id=orderId();
    // Re-validate any coupon on the server (never trust a discount amount sent by the client).
@@ -157,14 +160,22 @@ async function api(req,res,p){
        couponCode=c.code;
      }
    }
-   const taxableSubtotal=Math.max(0,subtotal-discount),gstRate=Number(db.settings.gst||0);
-   // Prices are treated as GST-inclusive, so GST is extracted for reporting and does not change the customer-facing total.
-   const gst=gstRate>0?Math.round(taxableSubtotal*gstRate/(100+gstRate)):0;
-   const total=taxableSubtotal+shipping;
-   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),pin:String(x.pin),items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:''};
-   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total},'application/json',origin);
+   const customerState=String(x.state||x.customerState||'').trim();
+   const sellerState=String(db.settings.sellerState||'').trim();
+   const gstInclusive=x.gstInclusive!==false && x.gstIncluded!==false;
+   const discountFactor=subtotal>0?Math.max(0,1-(discount/subtotal)):0;
+   let gst=0,taxableSubtotal=0;
+   const rates=[];
+   for(const it of requested){const gross=priceNumber(it.price)*Math.max(1,it.qty)*discountFactor;const rate=Math.max(0,Math.min(100,Number(it.gstRate)||0));rates.push(rate);const lineGst=gstInclusive?gross*rate/(100+rate):gross*rate/100;gst+=lineGst;taxableSubtotal+=gstInclusive?gross-lineGst:gross;}
+   gst=Math.round(gst*100)/100;taxableSubtotal=Math.round(taxableSubtotal*100)/100;
+   const interstate=Boolean(sellerState&&customerState&&sellerState.toLowerCase()!==customerState.toLowerCase());
+   const cgst=interstate?0:Math.round(gst/2*100)/100, sgst=interstate?0:Math.round((gst-cgst)*100)/100, igst=interstate?gst:0;
+   const total=Math.round((subtotal-discount+shipping+(gstInclusive?0:gst))*100)/100;
+   const uniqueRates=[...new Set(rates)].sort((a,b)=>a-b), gstRate=uniqueRates.length===1?uniqueRates[0]:0;
+   const order={name:String(x.name).trim(),email:String(x.email).trim().toLowerCase(),phone:String(x.phone).trim(),address:String(x.address).trim(),city:String(x.city||'').trim(),state:customerState,pin:String(x.pin),placeOfSupply:customerState,sellerState,items:requested,subtotal,discount,couponCode,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,shipping,total,payment:String(x.payment||'cod').toLowerCase(),orderId:id,status:'New',date:new Date().toISOString(),userId:customer?.userId||null,verified:true,awb:'',courier:'',tracking_url:'',idempotencyKey:idem||''};
+   db.orders.unshift(order);audit('order.created',{orderId:id});save(db);return send(res,201,{orderId:id,total,taxableSubtotal,gstRate,gst,gstInclusive,cgst,sgst,igst,items:requested},'application/json',origin);
   }
-  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items},'application/json',origin)}
+  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,subtotal:o.subtotal,discount:o.discount,shipping:o.shipping,taxableSubtotal:o.taxableSubtotal,gstRate:o.gstRate,gst:o.gst,gstInclusive:o.gstInclusive,cgst:o.cgst||0,sgst:o.sgst||0,igst:o.igst||0,state:o.state,city:o.city,pin:o.pin,address:o.address,payment:o.payment,items:o.items},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/music/current'){
     const m=db.music||{};

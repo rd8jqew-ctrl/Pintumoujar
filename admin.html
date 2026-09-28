@@ -1102,6 +1102,7 @@ async function restoreServerBackup(){
         sku:document.getElementById('es')?.value.trim()||p.sku,
         price:String(Number(document.getElementById('ep')?.value||0)),
         gstRate:Math.min(100,Math.max(0,Number(document.getElementById('egst')?.value??p.gstRate??5))),
+        hsn:String(document.getElementById('ehsn')?.value||p.hsn||'').trim(),
         cost:Number(document.getElementById('ecost')?.value||0),
         category:document.getElementById('ec')?.value.trim()||p.category,
         description:document.getElementById('edesc')?.value||'',

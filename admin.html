@@ -487,16 +487,7 @@ button:active,.btn:active,.yt-quick-card:active{transform:scale(.97)!important}
 </section>
 
 <section id="orders" class="section"><h2>Orders</h2><div class="tabs"><button class="btn" onclick="downloadOrders()">Export Orders</button></div>
-<input class="search" placeholder="Search order / customer / product / AWB" oninput="renderOrders(this.value)">
-<div id="bulkBar" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;padding:8px;border:1px solid #333;border-radius:8px">
-<span id="bulkCount" class="muted">0 selected</span>
-<button class="btn good" onclick="bulkSetStatus('Packed')">Mark Packed</button>
-<button class="btn" onclick="bulkSetStatus('Shipped')">Mark Shipped</button>
-<button class="btn" onclick="bulkSetStatus('Out for Delivery')">Mark Out for Delivery</button>
-<button class="btn primary" onclick="bulkSetStatus('Delivered')">Mark Delivered</button>
-<button class="btn" onclick="bulkClear()">Clear selection</button>
-</div>
-<div id="ordersList"></div></section>
+<input class="search" placeholder="Search order/customer/product" oninput="renderOrders(this.value)"><div id="ordersList"></div></section>
 
 <section id="inventory" class="section"><h2>Inventory</h2><div class="stats"><div class="stat">Units<b id="units">0</b></div><div class="stat">Low Stock<b id="low">0</b></div><div class="stat">Out of Stock<b id="out">0</b></div><div class="stat">SKUs<b id="skuCount">0</b></div></div>
 <div class="box" style="margin-top:12px"><h3>Stock Add / Remove / Set</h3><select id="ip"></select><select id="is"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
@@ -705,14 +696,14 @@ function newOrder(id){let p=prod(id),size=bs.value,qty=Math.max(1,+bq2.value||1)
 function orderCard(o){let p=prod(o.productId);return `<div class=order><div style="display:flex;justify-content:space-between"><b>${o.id}</b><span class=pill>${o.status}</span></div><div class=orderbody><div class=orderimg>YT</div><div><b>${p?.name||'Deleted Product'}</b><br>SKU: ${p?.sku||'—'}<br>Size: <b>${o.size||'—'}</b> · Color: <b>${o.color||'—'}</b> · Qty: <b>${o.qty||1}</b><br>Unit: ${money(o.price)} · Total: <b>${money(o.price*o.qty)}</b><br>Payment: ${o.payment}<br><span class=muted>${o.customer} · ${o.phone}<br>${o.date}</span></div></div><h3>Delivery Address</h3><div class=address>${o.customer}
 ${o.address}
 📞 ${o.phone}</div><p class=small>${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class=muted>AWB: <b>${o.awb}</b>${o.tracking_url?` · <a href="${o.tracking_url}" target="_blank" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class=timeline>${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div>
-<button class="btn good" onclick="setOrderStatus('${o.id}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${o.id}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${o.id}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${o.id}','Delivered')">Delivered</button><button class="btn" onclick="verify('${o.id}')">Verify Address</button><button class="btn" onclick="shipment('${o.id}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${o.id}')">Invoice</button><button class="btn" onclick="addressSlip('${o.id}')">📄 Address / Packing Slip (PDF)</button>${ytSelBox(o.id)}${ytBtns(o.id)}<button class="btn danger" onclick="cancelOrder('${o.id}')">Cancel</button><br><br><button class=btn onclick="details('${o.id}')">Full Details</button></div>`}
+<button class="btn good" onclick="setOrderStatus('${o.id}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${o.id}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${o.id}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${o.id}','Delivered')">Delivered</button><button class="btn" onclick="verify('${o.id}')">Verify Address</button><button class="btn" onclick="shipment('${o.id}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${o.id}')">Invoice</button><button class="btn" onclick="addressSlip('${o.id}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${o.id}')">Cancel</button><br><br><button class=btn onclick="details('${o.id}')">Full Details</button></div>`}
 function renderOrders(q=''){let a=state.orders.filter(o=>(o.id+o.customer+(prod(o.productId)?.name||'')).toLowerCase().includes(q.toLowerCase()));ordersList.innerHTML=a.length?a.map(orderCard).join(''):'<p class=muted>No matching orders.</p>'}
 function renderCustomerOrders(){customerOrderList.innerHTML=state.orders.map(orderCard).join('')}
 function setOrderStatus(id,s){let o=state.orders.find(x=>x.id===id);if(o){o.status=s;save();renderOrders();renderCustomerOrders();updateDash();toast('Order status: '+s)}}
 function cancelOrder(id){let o=state.orders.find(x=>x.id===id);if(!o)return;if(['Delivered','Cancelled'].includes(o.status)){toast('Cannot cancel this order');return}let x=state.inventory.find(x=>x[0]===o.productId&&x[1]===o.size);if(x){x[2]+=o.qty;state.history.push({time:new Date().toLocaleString(),p:prod(o.productId)?.name||'',s:o.size,from:x[2]-o.qty,to:x[2],r:'Cancelled order stock return'})}o.status='Cancelled';save();renderOrders();renderInventory();toast('Order cancelled and stock returned')}
 function verify(id){let o=state.orders.find(x=>x.id===id);if(o){o.verified=true;save();renderOrders();toast('Address verified')}}
 function details(id){let o=state.orders.find(x=>x.id===id),p=prod(o.productId);const itemTotal=(o.price||0)*(o.qty||1),orderTotal=Number(o.total)||itemTotal;openModal(`<h2>${o.id}</h2><div class=row><span>Customer</span><b>${o.customer}</b></div><div class=row><span>Product</span><b>${p?.name}</b></div><div class=row><span>Size</span><b>${o.size||'—'}</b></div><div class=row><span>Color</span><b>${o.color||'—'}</b></div><div class=row><span>Quantity</span><b>${o.qty||1}</b></div><div class=row><span>Item Price</span><b>${money(itemTotal)}</b></div>${o.discount?`<div class=row><span>Discount${o.couponCode?' ('+o.couponCode+')':''}</span><b>- ${money(o.discount)}</b></div>`:''}<div class=row><span>Shipping</span><b>${o.shipping?money(o.shipping):'FREE'}</b></div><div class=row><span>Order Total</span><b>${money(orderTotal)}</b></div><div class=row><span>Payment</span><b>${o.payment}</b></div><h3>Address</h3><div class=address>${o.address}</div>`)}
-function shipment(id){let o=state.orders.find(x=>x.id===id);openModal(`<h2>Shipment / AWB</h2><input id=awb value="${o.awb||''}"><select id=shipCourier><option ${o.courier==='Delhivery'?'selected':''}>Delhivery</option><option ${o.courier==='Shiprocket'?'selected':''}>Shiprocket</option></select><input id=track value="${o.tracking_url||''}"><p class=muted>Courier API keys are configured on the server, never in the browser.</p><button class="btn primary" onclick="saveShipment('${id}')">Save Shipment</button>`)}
+function shipment(id){let o=state.orders.find(x=>x.id===id);openModal(`<h2>Shipment / AWB</h2><input id=awb value="${o.awb||('AWB-'+id.replace('#',''))}"><select id=shipCourier><option ${o.courier==='Delhivery'?'selected':''}>Delhivery</option><option ${o.courier==='Shiprocket'?'selected':''}>Shiprocket</option></select><input id=track value="${o.tracking_url||''}"><p class=muted>Courier API keys are configured on the server, never in the browser.</p><button class="btn primary" onclick="saveShipment('${id}')">Save Shipment</button>`)}
 function saveShipment(id){let o=state.orders.find(x=>x.id===id);if(!o)return;o.awb=awb.value||'';o.courier=shipCourier.value;o.tracking_url=track.value||'';save();closeModal();renderOrders();renderCustomerOrders();toast('Shipment saved')}
 function validateAddress(){openModal(`<h2>Address Validation</h2><div class=address>
 </div><p>✓ Required fields present<br>✓ PIN format valid<br>✓ City/state present<br>✓ Phone present<br>⚠ Live PIN/courier validation connects after backend deployment.</p><button class="btn primary" onclick="toast('Address marked verified');closeModal()">Mark Verified</button>`)}
@@ -810,13 +801,17 @@ function legacyDownloadReport(){let g=+state.settings.gst||0,live=state.orders.f
 function downloadManual(){downloadText('YOUR_TYPE_STORE_MANUAL.txt','YOUR TYPE STORE MANUAL\\n\\nCustomer: Browse → choose size → place order → My Orders.\\nAdmin: Dashboard → Orders → Inventory → Products → Customers → Reports.\\nInventory is size/SKU based and order placement deducts stock.\\nProduction: deploy the included Node/SQLite backend, configure secrets in .env, payment/courier/notification providers, domain and legal pages.')}
 function pdfNum(v){return Number(String(v??0).replace(/[^0-9.-]/g,''))||0}
 function pdfEscape(s){return String(s==null?'':s).replace(/₹/g,'Rs. ').replace(/[""]/g,'"').replace(/['']/g,"'").replace(/[—–]/g,'-').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').replace(/[^\x20-\x7e]/g,'?')}
+const PDF_W_REG=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+const PDF_W_BOLD=[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+function pdfGlyphW(code,bold){const t=bold?PDF_W_BOLD:PDF_W_REG,i=code-32;return(i>=0&&i<t.length)?t[i]:556}
+function pdfStrWidth(str,size,bold){let w=0;const s=String(str==null?'':str);for(let i=0;i<s.length;i++)w+=pdfGlyphW(s.charCodeAt(i),bold);return w*size/1000}
 function pdfDoc(width,height){
   const ops=[];
   function txt(x,y,size,str,o={}){const font=o.font||'F1',c=o.color||[0.09,0.09,0.09];let cmd=`BT /${font} ${size} Tf ${c[0]} ${c[1]} ${c[2]} rg`;if(o.spacing)cmd+=` ${o.spacing} Tc`;cmd+=` ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(str)}) Tj ET`;ops.push(cmd)}
-  function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',avg=bold?0.6:0.54,w=String(str==null?'':str).length*size*avg;txt(xRight-w,y,size,str,o)}
+  function textRight(xRight,y,size,str,o={}){const bold=(o.font||'F1')==='F2',w=pdfStrWidth(str,size,bold);txt(xRight-w,y,size,str,o)}
   function line(x1,y1,x2,y2,o={}){const c=o.color||[0.82,0.82,0.82],w=o.width||0.75;ops.push(`q ${w} w ${c[0]} ${c[1]} ${c[2]} RG ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S Q`)}
   function rect(x,y,w,h,o={}){let cmd='q ';if(o.fill)cmd+=`${o.fill[0]} ${o.fill[1]} ${o.fill[2]} rg `;if(o.stroke)cmd+=`${o.width||0.75} w ${o.stroke[0]} ${o.stroke[1]} ${o.stroke[2]} RG `;cmd+=`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re `;cmd+=o.fill&&o.stroke?'B':o.fill?'f':'S';cmd+=' Q';ops.push(cmd)}
-  function build(){const stream=ops.join('\n');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
+  function build(){const stream=ops.join('\n');const wRegStr=PDF_W_REG.join(' '),wBoldStr=PDF_W_BOLD.join(' ');const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [${wRegStr}] >>`,`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [${wBoldStr}] >>`];let pdf='%PDF-1.4\n',offsets=[0];objs.forEach((o,i)=>{offsets.push(pdf.length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const xrefStart=pdf.length;pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;return pdf}
   return {txt,textRight,line,rect,build};
 }
 function downloadPDF(){
@@ -838,54 +833,80 @@ function downloadPDF(){
 function buildOrderPdf(o,kind){
   const W=595,H=842,M=48,doc=pdfDoc(W,H);
   const items=Array.isArray(o.items)&&o.items.length?o.items:[{name:prod(o.productId)?.name||'Product',sku:o.sku||prod(o.productId)?.sku||'',size:o.size||'M',color:o.color||'',price:o.price||0,qty:o.qty||1}];
-  let y=H-56;
-  doc.txt(M,y,22,'YOUR TYPE',{font:'F2'});
-  doc.txt(M,y-15,8.5,'PREMIUM STREETWEAR',{color:[0.45,0.45,0.45],spacing:1.4});
-  doc.textRight(W-M,y,16,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2'});
-  doc.textRight(W-M,y-15,9,'Order '+(o.id||'—'),{color:[0.4,0.4,0.4]});
-  y-=34;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=24;
-  const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-  doc.txt(M,y,7.5,'DATE',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M,y-12,10.5,dateStr,{font:'F2'});
-  doc.txt(M+180,y,7.5,'PAYMENT',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+180,y-12,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
-  doc.txt(M+330,y,7.5,'STATUS',{color:[0.55,0.55,0.55],spacing:0.6});doc.txt(M+330,y-12,10.5,o.status||'New',{font:'F2'});
-  y-=38;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=22;
-  doc.txt(M,y,8,'BILL TO / SHIP TO',{font:'F2',color:[0.4,0.4,0.4],spacing:0.6});y-=16;
-  doc.txt(M,y,11,o.customer||'—',{font:'F2'});y-=14;
-  String(o.address||'—').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:[0.3,0.3,0.3]});y-=13});
-  doc.txt(M,y,10,'Phone: '+(o.phone||'—'),{color:[0.3,0.3,0.3]});y-=13;
-  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:[0.3,0.3,0.3]});y-=13}
-  y-=8;doc.line(M,y,W-M,y,{color:[0.88,0.88,0.88],width:0.75});y-=20;
-  const col={item:M,sku:M+195,size:M+270,qty:M+330,unit:M+375,total:W-M};
-  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:[0.4,0.4,0.4]});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:[0.4,0.4,0.4]});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:[0.4,0.4,0.4]});
-  y-=8;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=16;
+  const INK=[0.082,0.078,0.071],MUTED=[0.48,0.46,0.41],SOFT=[0.24,0.23,0.21],FAINT=[0.86,0.84,0.77],WASH=[0.95,0.94,0.90],GREEN=[0.16,0.45,0.27],AMBER=[0.55,0.38,0.05];
+  let y=H-40;
+  doc.rect(0,H-92,W,92,{fill:INK});
+  doc.txt(M,y,21,'YOUR TYPE',{font:'F2',color:[1,1,1]});
+  doc.txt(M,y-14,8,'PREMIUM STREETWEAR',{color:[0.72,0.70,0.63],spacing:1.6});
+  doc.textRight(W-M,y,15,kind==='invoice'?'TAX INVOICE':'PACKING SLIP',{font:'F2',color:[1,1,1]});
+  doc.textRight(W-M,y-15,9,'Order '+(o.id||'\u2014'),{color:[0.72,0.70,0.63]});
+  y=H-92-28;
+  const dateStr=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'\u2014';
+  doc.txt(M,y,7.5,'DATE',{color:MUTED,spacing:0.6});doc.txt(M,y-13,10.5,dateStr,{font:'F2'});
+  doc.txt(M+175,y,7.5,'PAYMENT',{color:MUTED,spacing:0.6});doc.txt(M+175,y-13,10.5,String(o.payment||'cod').toUpperCase(),{font:'F2'});
+  doc.txt(M+320,y,7.5,'STATUS',{color:MUTED,spacing:0.6});
+  const statusStr=o.status||'New',pillW=statusStr.length*6.2+18;
+  doc.rect(M+320,y-24,pillW,16,{fill:INK});
+  doc.txt(M+320+9,y-19.5,9,statusStr,{font:'F2',color:[1,1,1]});
+  y-=42;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=26;
+  doc.txt(M,y,8,'DELIVERY ADDRESS',{font:'F2',color:MUTED,spacing:0.6});y-=16;
+  doc.txt(M,y,11.5,o.customer||'\u2014',{font:'F2'});y-=15;
+  String(o.address||'\u2014').split('\n').forEach(l=>{doc.txt(M,y,10,l,{color:SOFT});y-=13});
+  doc.txt(M,y,10,'Phone: '+(o.phone||'\u2014'),{color:SOFT});y-=13;
+  if(o.email){doc.txt(M,y,10,'Email: '+o.email,{color:SOFT});y-=13}
+  y-=8;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=24;
+  const col={item:M+8,sku:M+205,size:M+275,qty:M+335,unit:M+375,total:W-M-8};
+  doc.rect(M,y-6,W-2*M,20,{fill:WASH});
+  doc.txt(col.item,y,8,'ITEM',{font:'F2',color:MUTED});doc.txt(col.sku,y,8,'SKU',{font:'F2',color:MUTED});doc.txt(col.size,y,8,'SIZE/COLOR',{font:'F2',color:MUTED});doc.txt(col.qty,y,8,'QTY',{font:'F2',color:MUTED});doc.textRight(col.unit+45,y,8,'UNIT',{font:'F2',color:MUTED});doc.textRight(col.total,y,8,'TOTAL',{font:'F2',color:MUTED});
+  y-=26;
   items.forEach(it=>{
     const qty=Math.max(1,pdfNum(it.qty)),price=pdfNum(it.price);
     doc.txt(col.item,y,9.5,String(it.name||'Product').slice(0,24),{font:'F2'});
-    doc.txt(col.sku,y,9.5,it.sku||'—',{color:[0.4,0.4,0.4]});
-    doc.txt(col.size,y,9.5,(it.size||'—')+' / '+(it.color||'—'),{color:[0.4,0.4,0.4]});
+    doc.txt(col.sku,y,9.5,it.sku||'\u2014',{color:MUTED});
+    doc.txt(col.size,y,9.5,(it.size||'\u2014')+' / '+(it.color||'\u2014'),{color:MUTED});
     doc.txt(col.qty,y,9.5,String(qty));
     doc.textRight(col.unit+45,y,9.5,money(price));
     doc.textRight(col.total,y,9.5,money(price*qty),{font:'F2'});
-    y-=17;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.93,0.93],width:0.5});
+    y-=18;doc.line(M,y+6,W-M,y+6,{color:[0.93,0.92,0.89],width:0.5});
   });
-  y-=5;doc.line(M,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=22;
+  y-=6;doc.line(M,y,W-M,y,{color:INK,width:1});y-=22;
   const itemsSum=items.reduce((s,it)=>s+pdfNum(it.price)*Math.max(1,pdfNum(it.qty)),0);
-  const discount=pdfNum(o.discount),shipping=pdfNum(o.shipping),gst=pdfNum(o.gst);
-  const subtotal=o.subtotal||itemsSum,total=o.total||Math.max(0,itemsSum-discount)+shipping;
-  const boxX=W-M-210;
-  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||[0.45,0.45,0.45]});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.15]});y-=15}
+  const discount=Math.max(0,pdfNum(o.discount));
+  const shipping=Math.max(0,pdfNum(o.shipping));
+  const gstRate=Math.max(0,pdfNum(o.gstRate)||pdfNum(state.settings?.gst)||0);
+  // Product prices in YOUR TYPE are configured as GST-inclusive. Always derive the
+  // GST component from the discounted merchandise value so the invoice cannot show
+  // a stale/mismatched tax amount.
+  const grossMerchandise=Math.max(0,itemsSum-discount);
+  const derivedGst=gstRate>0 ? grossMerchandise-(grossMerchandise/(1+gstRate/100)) : 0;
+  const gst=(pdfNum(o.gst)>0 ? pdfNum(o.gst) : derivedGst);
+  const subtotal=pdfNum(o.subtotal)>0 ? pdfNum(o.subtotal) : itemsSum;
+  const calculatedTotal=grossMerchandise+shipping;
+  const total=calculatedTotal;
+  const boxX=W-M-220;
+  function totalRow(label,val,o2={}){doc.txt(boxX,y,9.5,label,{font:o2.font||'F1',color:o2.color||MUTED});doc.textRight(W-M,y,9.5,val,{font:o2.font||'F1',color:o2.color||[0.15,0.15,0.14]});y-=16}
   totalRow('Subtotal',money(subtotal));
-  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:[0.1,0.5,0.25]});
+  if(discount>0)totalRow('Discount'+(o.couponCode?' ('+o.couponCode+')':''),'- '+money(discount),{color:GREEN});
   totalRow('Shipping',shipping>0?money(shipping):'FREE');
-  y-=3;doc.line(boxX,y,W-M,y,{color:[0.15,0.15,0.15],width:1});y-=18;
-  doc.txt(boxX,y,12,'TOTAL',{font:'F2'});doc.textRight(W-M,y,14,money(total),{font:'F2'});
-  y-=20;
-  if(gst>0){doc.txt(boxX,y,8,'(Includes GST of '+money(gst)+' at '+(o.gstRate||0)+'%)',{color:[0.55,0.55,0.55]});y-=14}
-  y-=18;
-  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?[0.1,0.5,0.25]:[0.6,0.4,0.05]});y-=14;
-  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:[0.35,0.35,0.35]});y-=14}
-  y-=14;doc.line(M,y,W-M,y,{color:[0.9,0.9,0.9],width:0.75});y-=18;
-  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:[0.55,0.55,0.55]});
+  if(gstRate>0){
+    totalRow('GST (included @ '+gstRate+'%)',money(gst),{color:[0.20,0.20,0.20]});
+  }
+  y-=2;doc.line(boxX,y,W-M,y,{color:FAINT,width:0.75});y-=2;
+  const bandH=28,bandW=(W-M)-boxX;
+  doc.rect(boxX,y-bandH+8,bandW,bandH,{fill:INK});
+  doc.txt(boxX+12,y-bandH+18,12.5,'TOTAL',{font:'F2',color:[1,1,1]});
+  doc.textRight(W-M-12,y-bandH+18,15,money(total),{font:'F2',color:[1,1,1]});
+  y-=bandH+16;
+  if(gstRate>0){
+    const taxable=Math.max(0,grossMerchandise-gst);
+    doc.txt(boxX,y,8,'Taxable value '+money(taxable)+' · GST included '+money(gst)+' @ '+gstRate+'%',{color:MUTED});
+    y-=16;
+  }
+  y-=6;
+  doc.txt(M,y,9.5,o.verified?'Address verified':'Address pending verification',{font:'F2',color:o.verified?GREEN:AMBER});y-=14;
+  if(o.awb){doc.txt(M,y,9.5,'AWB: '+o.awb+(o.courier?' ('+o.courier+')':''),{color:SOFT});y-=14}
+  y-=14;doc.line(M,y,W-M,y,{color:FAINT,width:0.75});y-=18;
+  doc.txt(M,y,8.5,'Thank you for shopping with YOUR TYPE. This is a computer-generated document.',{color:MUTED});
   return doc.build();
 }
 function addressSlip(id){let o=state.orders.find(x=>String(x.id)===String(id));if(!o){toast('Order not found');return}downloadText('YOUR_TYPE_PACKING_SLIP_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf',buildOrderPdf(o,'slip'),'application/pdf')}
@@ -1204,7 +1225,22 @@ async function restoreServerBackup(){
 
   function localProduct(p){const sizes=p.sizes||{};return {id:String(p.id),name:p.name||'',price:num(p.price),cost:num(p.cost),sku:p.sku||'',category:p.category||'T-Shirts',description:p.description||'',sizes:Object.keys(sizes).filter(k=>['S','M','L','XL','XXL'].includes(k)),colors:Array.isArray(p.colors)&&p.colors.length?p.colors:['Black','White','Charcoal'],images:Array.isArray(p.images)&&p.images.length?p.images:[p.image||''],image:p.image||((p.images||[])[0]||''),hidden:p.active===false,featured:Boolean(p.featured)}};
   function localOrder(o){
-    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:o.address||'',city:o.city||'',pin:o.pin||'',state:o.state||'',productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[],subtotal:num(o.subtotal),discount:num(o.discount),couponCode:o.couponCode||'',taxableSubtotal:num(o.taxableSubtotal),gstRate:num(o.gstRate),gst:num(o.gst),shipping:num(o.shipping),total:num(o.total)};}
+    if(o&&o.orderId){const it=Array.isArray(o.items)&&o.items[0]||{};return {id:o.orderId,customer:o.name||'',email:o.email||'',phone:o.phone||'',address:[o.address,o.city,o.pin].filter(Boolean).join('\n'),productId:(it.productId||'')||((state.products.find(p=>p.name===it.name&&p.image===it.image)||{}).id||''),size:it.size||'',color:it.color||'',qty:Number(it.qty||1),price:num(it.price),image:it.image||'',sku:it.sku||'',payment:o.payment||'cod',status:o.status||'New',verified:Boolean(o.verified),awb:o.awb||'',courier:o.courier||'',tracking_url:o.tracking_url||'',date:o.date||'',serverOrderId:o.orderId,items:Array.isArray(o.items)?o.items:[],subtotal:num(o.subtotal),discount:num(o.discount),couponCode:o.couponCode||'',taxableSubtotal:num(o.taxableSubtotal),gstRate:num(o.gstRate),gst:num(o.gst),shipping:num(o.shipping),total:num(o.total)};}
+    return o;
+  }
+
+  function normalizeOrderTax(o){
+    if(!o)return o;
+    const items=Array.isArray(o.items)?o.items:[];
+    const itemSubtotal=items.reduce((sum,it)=>sum+num(it.price)*Math.max(1,num(it.qty)),0);
+    const discount=Math.max(0,num(o.discount));
+    const shipping=Math.max(0,num(o.shipping));
+    const rate=Math.max(0,num(o.gstRate)||num(state.settings?.gst)||0);
+    const gross=Math.max(0,itemSubtotal-discount);
+    const gst=rate>0 ? gross-(gross/(1+rate/100)) : 0;
+    o.subtotal=itemSubtotal; o.gstRate=rate; o.gst=Number((num(o.gst)>0?num(o.gst):gst).toFixed(2));
+    o.total=Number((gross+shipping).toFixed(2));
+    o.taxableSubtotal=Number((gross-o.gst).toFixed(2));
     return o;
   }
 
@@ -1212,7 +1248,7 @@ async function restoreServerBackup(){
     const d=await fcServer('/api/admin/data');
     const products=Array.isArray(d.products)?d.products:[];state.products=products.map(localProduct);
     state.inventory=[];products.forEach(p=>Object.entries(p.sizes||{}).forEach(([sz,n])=>state.inventory.push([String(p.id),sz,Math.max(0,num(n)),5])));
-    state.orders=(Array.isArray(d.orders)?d.orders:[]).map(localOrder);
+    state.orders=(Array.isArray(d.orders)?d.orders:[]).map(localOrder).map(normalizeOrderTax);
     state.coupons=Array.isArray(d.coupons)?d.coupons.map(c=>({id:c.id,code:c.code,percent:c.type==='percent'?num(c.value):0,min:num(c.minOrder),expiry:c.expiresAt?String(c.expiresAt).slice(0,10):'',active:c.active!==false,type:c.type||'percent',value:num(c.value)})):[];
     state.reviews=d.reviews||[];state.newsletter=d.newsletter||[];state.returns=d.returns||[];state.notifications=d.notifications||[];state.audit=d.audit||[];state.settings=d.settings||state.settings||{};
     try{const sd=await fetch('/api/site-config',{cache:'no-store'}).then(r=>r.json());const site=sd.site||{};state.website=Object.assign({},state.website||{},site);if(Array.isArray(site.categories))state.categories=site.categories.slice();state.sectionSettings=site.sections||state.sectionSettings}catch(_){}
@@ -1221,27 +1257,12 @@ async function restoreServerBackup(){
 
   window.doAdminLogin=async function(){const u=String(document.getElementById('loginUser')?.value||'').trim(),pw=String(document.getElementById('loginPass')?.value||'');if(!u||!pw){toast('Enter username and password');return}try{const x=await api2('/api/admin/login',{method:'POST',body:JSON.stringify({username:u,password:pw})});setAdminToken(x.token);closeModal();await sync();go('dashboard');toast('Connected to website database')}catch(e){toast(e.message||'Login failed')}};
 
-  window.renderOrders=function(q=''){const term=String(q||'').toLowerCase();const a=state.orders.filter(o=>(o.id+' '+o.customer+' '+(o.awb||'')+' '+(productById(o.productId)?.name||'')).toLowerCase().includes(term));ordersList.innerHTML=a.length?a.map(orderCard).join(''):'<p class="muted">No matching orders.</p>';};
+  window.renderOrders=function(q=''){const term=String(q||'').toLowerCase();const a=state.orders.filter(o=>(o.id+' '+o.customer+' '+(productById(o.productId)?.name||'')).toLowerCase().includes(term));ordersList.innerHTML=a.length?a.map(orderCard).join(''):'<p class="muted">No matching orders.</p>';};
   window.renderCustomerOrders=function(){customerOrderList.innerHTML=state.orders.length?state.orders.map(orderCard).join(''):'<p class="muted">No orders yet.</p>';};
   window.setOrderStatus=async function(id,s){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({status:s})});await sync();toast('Order status: '+s)}catch(e){toast(e.message)}};
   window.verify=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({verified:true})});await sync();toast('Address verified')}catch(e){toast(e.message)}};
   window.saveShipment=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({awb:document.getElementById('awb')?.value||'',courier:document.getElementById('shipCourier')?.value||'',tracking_url:document.getElementById('track')?.value||''})});closeModal();await sync();toast('Shipment saved')}catch(e){toast(e.message)}};
   window.cancelOrder=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;if(['Delivered','Cancelled'].includes(o.status)){toast('Cannot cancel this order');return}if(!confirm('Cancel this order?'))return;try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({status:'Cancelled'})});await sync();toast('Order cancelled')}catch(e){toast(e.message)}};
-  window.bulkSelected=window.bulkSelected||new Set();
-  window.updateBulkBar=function(){const n=window.bulkSelected.size;const bar=document.getElementById('bulkBar');if(bar)bar.style.display=n?'flex':'none';const c=document.getElementById('bulkCount');if(c)c.textContent=n+' selected';};
-  window.toggleBulk=function(id){id=String(id);if(window.bulkSelected.has(id))window.bulkSelected.delete(id);else window.bulkSelected.add(id);window.updateBulkBar();};
-  window.bulkClear=function(){window.bulkSelected.clear();window.updateBulkBar();renderOrders(document.querySelector('.search')?.value||'');};
-  window.bulkSetStatus=async function(status){
-    const ids=[...window.bulkSelected];if(!ids.length)return;
-    if(!confirm('Mark '+ids.length+' order(s) as '+status+'?'))return;
-    let okCount=0,failCount=0;
-    for(const id of ids){const o=state.orders.find(x=>String(x.id)===id);if(!o)continue;
-      try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({status})});okCount++}catch(e){failCount++}
-    }
-    window.bulkSelected.clear();await sync();window.updateBulkBar();
-    toast(okCount+' updated'+(failCount?', '+failCount+' failed (still awaiting payment?)':''));
-  };
-
   window.deleteOrder=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;if(!confirm('Delete this order permanently? This cannot be undone.'))return;try{await api2('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'DELETE'});await sync();toast('Order deleted from website database')}catch(e){toast(e.message)}};
 
   async function patchStock(id,size,newValue){const p=productById(id);if(!p)return;const raw=state.products.find(x=>String(x.id)===String(id));const current={S:0,M:0,L:0,XL:0,XXL:0};const row=state.inventory.find(x=>String(x[0])===String(id)&&x[1]===size);current[size]=Math.max(0,num(newValue));for(const r of state.inventory.filter(x=>String(x[0])===String(id)))current[r[1]]=Math.max(0,num(r[2]));try{await api2('/api/admin/products/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({sizes:current})});await sync();toast('Stock saved to website')}catch(e){toast(e.message)}}
@@ -1265,7 +1286,7 @@ async function restoreServerBackup(){
   window.newOrder=async function(id){const p=productById(id),size=document.getElementById('bs')?.value,qty=Math.max(1,num(document.getElementById('bq2')?.value)),customer=(document.getElementById('bcustomer')?.value||'').trim(),phone=(document.getElementById('bphone')?.value||'').trim(),address=(document.getElementById('baddress')?.value||'').trim();if(!p||!size){toast('Select a product and size');return}if(!customer||!phone||!address){toast('Customer, phone and address are required');return}const m=address.match(/(?:^|\n)\s*(?:.*?)(?:-|—)\s*(\d{6})\s*$/);const pin=m?m[1]:(address.match(/\b\d{6}\b/)||[])[0]||'';try{await api2('/api/orders',{method:'POST',body:JSON.stringify({name:customer,email:'admin-order@yourtype.local',phone,address,city:'',pin,items:[{name:p.name,image:p.image,size,qty}]})});await sync();closeModal();go('orders');toast('Order placed on website')}catch(e){toast(e.message)}};
 
   // Render order cards with server-shape-safe data, avoiding undefined/NaN.
-  window.orderCard=function(o){const p=productById(o.productId),qty=Math.max(1,num(o.qty)),price=num(o.price),imgProduct=p||{name:o.items?.[0]?.name||'Product',image:o.image||o.items?.[0]?.image||'',images:o.image||o.items?.[0]?.image?[o.image||o.items?.[0]?.image]:[]};const bulkOn=window.bulkSelected&&window.bulkSelected.has(String(o.id));return `<div class="order"><div style="display:flex;justify-content:space-between;align-items:center"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" onclick="event.stopPropagation();toggleBulk('${esc(o.id)}')" ${bulkOn?'checked':''}><b>${esc(o.id||'—')}</b></label><span class="pill">${esc(o.status||'New')}</span></div><div class="orderbody"><div class="orderimg">${picHtml(imgProduct)}</div><div><b>${esc(p?.name||'Product')}</b><br>SKU: ${esc(p?.sku||'—')}<br>Size: <b>${esc(o.size||'—')}</b> · Color: <b>${esc(o.color||'—')}</b> · Qty: <b>${qty}</b><br>Unit: ${money(price)} · Order Total: <b>${money(num(o.total)||price*qty)}</b><br>Payment: ${esc(o.payment||'COD')}<br><span class="muted">${esc(o.customer||'—')} · ${esc(o.phone||'—')}<br>${esc(o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—')}</span></div></div><h3>Delivery Address</h3><div class="address">${esc(o.customer||'—')}\n${esc(o.address||'—')}\n📞 ${esc(o.phone||'—')}</div><p class="small">${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class="muted">AWB: <b>${esc(o.awb)}</b>${o.tracking_url?` · <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class="timeline">${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div><button class="btn good" onclick="setOrderStatus('${esc(o.id)}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${esc(o.id)}','Delivered')">Delivered</button><button class="btn" onclick="verify('${esc(o.id)}')">Verify Address</button><button class="btn" onclick="shipment('${esc(o.id)}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${esc(o.id)}')">Invoice</button><button class="btn" onclick="addressSlip('${esc(o.id)}')">📄 Address / Packing Slip (PDF)</button>${ytSelBox(esc(o.id))}${ytBtns(esc(o.id))}<button class="btn danger" onclick="cancelOrder('${esc(o.id)}')">Cancel</button><br><br><button class="btn" onclick="details('${esc(o.id)}')">Full Details</button><button class="btn danger" onclick="deleteOrder('${esc(o.id)}')">Delete Order</button></div>`};
+  window.orderCard=function(o){const p=productById(o.productId),qty=Math.max(1,num(o.qty)),price=num(o.price),imgProduct=p||{name:o.items?.[0]?.name||'Product',image:o.image||o.items?.[0]?.image||'',images:o.image||o.items?.[0]?.image?[o.image||o.items?.[0]?.image]:[]};return `<div class="order"><div style="display:flex;justify-content:space-between"><b>${esc(o.id||'—')}</b><span class="pill">${esc(o.status||'New')}</span></div><div class="orderbody"><div class="orderimg">${picHtml(imgProduct)}</div><div><b>${esc(p?.name||'Product')}</b><br>SKU: ${esc(p?.sku||'—')}<br>Size: <b>${esc(o.size||'—')}</b> · Color: <b>${esc(o.color||'—')}</b> · Qty: <b>${qty}</b><br>Unit: ${money(price)} · Order Total: <b>${money(num(o.total)||price*qty)}</b><br>Payment: ${esc(o.payment||'COD')}<br><span class="muted">${esc(o.customer||'—')} · ${esc(o.phone||'—')}<br>${esc(o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—')}</span></div></div><h3>Delivery Address</h3><div class="address">${esc(o.customer||'—')}\n${esc(o.address||'—')}\n📞 ${esc(o.phone||'—')}</div><p class="small">${o.verified?'✓ Address verified':'⚠ Address pending verification'}</p>${o.awb?`<p class="muted">AWB: <b>${esc(o.awb)}</b>${o.tracking_url?` · <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener" style="color:#fff">Track Shipment</a>`:''}</p>`:''}<div class="timeline">${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].map((x,i)=>`<div class="step ${['Confirmed','Packed','Shipped','Out for Delivery','Delivered'].indexOf(o.status)>=i?'done':''}">${x}</div>`).join('')}</div><button class="btn good" onclick="setOrderStatus('${esc(o.id)}','Packed')">Packed</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Shipped')">Shipped</button><button class="btn" onclick="setOrderStatus('${esc(o.id)}','Out for Delivery')">Out for Delivery</button><button class="btn primary" onclick="setOrderStatus('${esc(o.id)}','Delivered')">Delivered</button><button class="btn" onclick="verify('${esc(o.id)}')">Verify Address</button><button class="btn" onclick="shipment('${esc(o.id)}')">AWB / Tracking</button><button class="btn" onclick="invoiceById('${esc(o.id)}')">Invoice</button><button class="btn" onclick="addressSlip('${esc(o.id)}')">📄 Address / Packing Slip (PDF)</button><button class="btn danger" onclick="cancelOrder('${esc(o.id)}')">Cancel</button><br><br><button class="btn" onclick="details('${esc(o.id)}')">Full Details</button><button class="btn danger" onclick="deleteOrder('${esc(o.id)}')">Delete Order</button></div>`};
 
   window.syncAdminNow=sync;
   window.addEventListener('load',()=>{if(getAdminToken()){sync().then(()=>{const saved=localStorage.getItem('ytAdminSection');if(saved&&document.getElementById(saved))go(saved)}).catch(e=>toast(e.message))}});
@@ -1325,7 +1346,7 @@ async function restoreServerBackup(){
 
   window.setOrderStatus=async function(id,s){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({status:s})});await refreshAdminData();if(window.syncAdminNow)await window.syncAdminNow();toast('Order status: '+s)}catch(e){toast(e.message)}};
   window.verify=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({verified:true})});if(window.syncAdminNow)await window.syncAdminNow();toast('Address verified')}catch(e){toast(e.message)}};
-  window.saveShipment=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({awb:document.getElementById('awb')?.value||'',courier:document.getElementById('shipCourier')?.value||'',tracking_url:document.getElementById('track')?.value||''})});closeModal();if(window.syncAdminNow)await window.syncAdminNow();toast('Shipment saved')}catch(e){toast(e.message)}};
+  window.saveShipment=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;try{const awb=String(document.getElementById('awb')?.value||'').trim();const courier=String(document.getElementById('shipCourier')?.value||'').trim();if(awb && awb===String(o.id))throw new Error('Order ID ko AWB field mein mat daalo. Courier ka actual AWB number daalo.');await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({awb,courier,tracking_url:document.getElementById('track')?.value||''})});closeModal();if(window.syncAdminNow)await window.syncAdminNow();toast('Shipment saved')}catch(e){toast(e.message)}};
   window.cancelOrder=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;if(['Delivered','Cancelled'].includes(o.status)){toast('Cannot cancel this order');return}if(!confirm('Cancel this order?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'PATCH',body:JSON.stringify({status:'Cancelled'})});if(window.syncAdminNow)await window.syncAdminNow();toast('Order cancelled')}catch(e){toast(e.message)}};
   window.deleteOrder=async function(id){const o=state.orders.find(x=>String(x.id)===String(id));if(!o)return;if(!confirm('Delete this order permanently? This cannot be undone.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(o.serverOrderId||o.id),{method:'DELETE'});if(window.syncAdminNow)await window.syncAdminNow();toast('Order deleted from website database')}catch(e){toast(e.message)}};
 
@@ -1640,277 +1661,4 @@ async function restoreServerBackup(){
   window.addEventListener('beforeunload',musicResumeSave);
 })();
 </script>
-<script src="/music-player.js" defer></script>
-<script>
-/* YOUR TYPE — PACKING SLIP / SHIPPING LABEL / INVOICE PDF
-   HTML template -> canvas -> PDF. Falls back to a print view if libraries can't load. */
-(function(){
-  const LIBS={h2c:'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',pdf:'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',qr:'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',bar:'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js'};
-  const FONT='https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Caveat:wght@600&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap';
-  const E=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const num=v=>Number(String(v??0).replace(/[^0-9.-]/g,''))||0;
-  const inr=n=>'₹ '+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
-  const safeFile=v=>String(v||'ORDER').replace(/[^A-Za-z0-9_-]/g,'');
-  const oid=o=>o.orderId||o.id||o.serverOrderId||'';
-  const findOrder=id=>(state.orders||[]).find(x=>String(x.id||x.orderId||x.serverOrderId)===String(id));
-  const loaded={};
-  function lib(k,test){if(test())return Promise.resolve(true);if(loaded[k])return loaded[k];
-    return loaded[k]=new Promise(res=>{const s=document.createElement('script');s.src=LIBS[k];s.onload=()=>res(!!test());s.onerror=()=>res(false);document.head.appendChild(s)})}
-  function loadFont(){if(document.getElementById('ytSlipFont'))return;const l=document.createElement('link');l.id='ytSlipFont';l.rel='stylesheet';l.href=FONT;document.head.appendChild(l)}
-  function toDataUrl(url){if(!url)return Promise.resolve('');if(/^data:/.test(url))return Promise.resolve(url);
-    return new Promise(res=>{try{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);res(c.toDataURL('image/jpeg',.9))}catch(_){res('')}};im.onerror=()=>res('');im.src=new URL(url,location.href).href}catch(_){res('')}})}
-
-  /* ---------- settings ---------- */
-  const DEF={lang:'en',logo:'',name:'Your Type',gstin:'',address:'',phone:'',email:'',policy:'Returns / exchange within 7 days of delivery with tags intact and original packaging.',promo:'Next order par 10% off - code THANKS10',social:'',returnUrl:'https://yourtype.in/return?order={id}',trackUrl:'https://yourtype.in/track?order={id}',badges:true};
-  const SL=()=>{const st=state.settings||{};return Object.assign({},DEF,{gstin:st.gstin||'',address:st.address||''},st.slip||{},{})};
-
-  /* ---------- language ---------- */
-  const D={en:{slip:'PACKING SLIP',invoice:'TAX INVOICE',thanks:'THANK YOU FOR YOUR ORDER',oid:'Order ID',scan:'Scan for order tracking',odate:'Order date',pay:'Payment method',status:'Order status',partner:'Delivery partner',ship:'Shipping address',bill:'Billing address',ty1:'Thank you',ty2:'for choosing us!',sno:'S.No',prod:'Product details',sku:'SKU',size:'Size / Color',qty:'Qty',unit:'Unit price',total:'Total',sub:'SUBTOTAL',shp:'SHIPPING',disc:'DISCOUNT',gst:'GST (Incl.',collect:'Collect from customer (COD)',prepaid:'PREPAID - DO NOT COLLECT',cod:'Cash on Delivery',paid:'Paid online',frag:'Handle with care',fragt:'FRAGILE - PACK CAREFULLY',gift:'Gift message',note:'Order note',q1:'Premium<br>quality',q2:'Fast &amp; reliable<br>delivery',q3:'Sustainable<br>packaging',q4:'24/7<br>support',track:'Track your order',visit:'Scan the QR code or visit',shipto:'Ship to',ret:'Return / exchange',retd:'Scan to request a return',sold:'Sold by',packed:'Packed by',checked:'Checked by',date:'Date',items:'Items',wt:'Weight',free:'FREE',tbd:'To be assigned',soon:'Tracking will be shared soon',ready:'Your order is ready',comp:'This is a computer-generated document; no signature required.',help:'Help',from:'FROM',to:'SHIP TO',awb:'AWB',courier:'Courier',incl:'Includes GST of Rs.'},
-  hi:{slip:'पैकिंग स्लिप',invoice:'टैक्स इनवॉइस',thanks:'आपके ऑर्डर के लिए धन्यवाद',oid:'ऑर्डर आईडी',scan:'ऑर्डर ट्रैक करने के लिए स्कैन करें',odate:'ऑर्डर की तारीख',pay:'भुगतान का तरीका',status:'ऑर्डर स्टेटस',partner:'डिलीवरी पार्टनर',ship:'शिपिंग पता',bill:'बिलिंग पता',ty1:'धन्यवाद',ty2:'हमें चुनने के लिए!',sno:'क्र.',prod:'प्रोडक्ट विवरण',sku:'SKU',size:'साइज़ / रंग',qty:'मात्रा',unit:'कीमत',total:'कुल',sub:'उप-कुल',shp:'शिपिंग',disc:'छूट',gst:'GST (शामिल',collect:'ग्राहक से वसूलें (COD)',prepaid:'प्रीपेड - पैसे न लें',cod:'कैश ऑन डिलीवरी',paid:'ऑनलाइन भुगतान हो चुका',frag:'सावधानी से संभालें',fragt:'नाज़ुक - सावधानी से पैक करें',gift:'गिफ्ट संदेश',note:'ऑर्डर नोट',q1:'बेहतरीन<br>क्वालिटी',q2:'तेज़ और भरोसेमंद<br>डिलीवरी',q3:'पर्यावरण अनुकूल<br>पैकेजिंग',q4:'24/7<br>सपोर्ट',track:'ऑर्डर ट्रैक करें',visit:'QR कोड स्कैन करें या यहाँ जाएँ',shipto:'भेजने का पता',ret:'रिटर्न / एक्सचेंज',retd:'रिटर्न के लिए स्कैन करें',sold:'विक्रेता',packed:'पैक किया',checked:'जाँचा',date:'तारीख',items:'आइटम',wt:'वज़न',free:'मुफ़्त',tbd:'जल्द तय होगा',soon:'ट्रैकिंग जल्द साझा होगी',ready:'आपका ऑर्डर तैयार है',comp:'यह कंप्यूटर द्वारा बनाया गया दस्तावेज़ है; हस्ताक्षर आवश्यक नहीं।',help:'मदद',from:'भेजने वाला',to:'पाने वाला',awb:'AWB',courier:'कूरियर',incl:'GST शामिल: Rs.'}};
-  const T=(l,k)=>(D[l]&&D[l][k])||D.en[k];
-
-  /* ---------- data helpers ---------- */
-  function productFor(it,o){const ps=state.products||[],id=it.productId||o.productId,sku=String(it.sku||o.sku||'').toLowerCase(),nm=String(it.name||o.productName||'').toLowerCase();
-    return ps.find(p=>id!=null&&String(p.id)===String(id))||ps.find(p=>sku&&String(p.sku||'').toLowerCase()===sku)||ps.find(p=>nm&&String(p.name||'').toLowerCase()===nm)||{}}
-  function itemsOf(o){const raw=Array.isArray(o.items)&&o.items.length?o.items:[o];
-    return raw.map(it=>{const p=productFor(it,o);return{name:p.name||it.name||o.productName||'Product',desc:p.tagline||p.description||'',sku:p.sku||it.sku||o.sku||'—',hsn:p.hsn||it.hsn||'6109',size:it.size||o.size||'—',color:it.color||o.color||'',qty:Math.max(1,Math.floor(num(it.qty||o.qty||1))),price:num(it.price||p.price||o.price),image:p.image||(Array.isArray(p.images)?p.images[0]:'')||it.image||o.image||''}})}
-  const STATES={560:'Karnataka',110:'Delhi',400:'Maharashtra',600:'Tamil Nadu',500:'Telangana',700:'West Bengal',380:'Gujarat',302:'Rajasthan',201:'Uttar Pradesh',226:'Uttar Pradesh'};
-  function addrLines(o){const a=String(o.address||'').replace(/\s+/g,' ').trim(),pin=String(o.pin||(a.match(/\b\d{6}\b/)||[''])[0]).trim(),st=o.state||STATES[pin.slice(0,3)]||'';
-    return [a,[o.city,pin].filter(Boolean).join(' - '),st?st+', India':'India'].filter(Boolean)}
-  function validGstin(v){const x=String(v||'').trim().toUpperCase();return /^[0-9A-Z]{15}$/.test(x)&&/[A-Z]/.test(x)&&/[0-9]/.test(x)?x:''}
-  async function qrOf(text){if(!(await lib('qr',()=>window.QRCode)))return'';try{const h=document.createElement('div');h.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(h);new QRCode(h,{text:String(text),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});await new Promise(r=>setTimeout(r,120));const c=h.querySelector('canvas'),im=h.querySelector('img');let u=c?c.toDataURL('image/png'):(im&&im.src?im.src:'');h.remove();return u}catch(_){return''}}
-  async function barOf(text,h){if(!(await lib('bar',()=>window.JsBarcode)))return'';try{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(s,String(text),{format:'CODE128',displayValue:false,height:h,margin:0,width:1.6});s.setAttribute('preserveAspectRatio','none');return s.outerHTML}catch(_){return''}}
-  function figures(o,items){const sub=num(o.subtotal)||items.reduce((s,i)=>s+i.price*i.qty,0),disc=num(o.discount),ship=num(o.shipping),rate=num(o.gstRate)||num(state.settings?.gst)||5,total=num(o.total)||Math.max(0,sub-disc)+ship,gst=num(o.gst)||Math.round(Math.max(0,sub-disc)*rate/(100+rate));return{sub,disc,ship,rate,total,gst}}
-
-  /* ---------- CSS ---------- */
-  const CSS=`.ys{width:794px;background:#f7f7f6;color:#0d0f10;font:11px/1.4 Archivo,'Noto Sans Devanagari',Arial,sans-serif;display:flex;flex-direction:column}
-.ys *{box-sizing:border-box;margin:0;padding:0}.ys.hi *{letter-spacing:0!important;text-transform:none!important}
-.ys .hd{background:#0d0f10;color:#fff;padding:22px 34px;display:flex;justify-content:space-between;align-items:center}
-.ys .logo{font-weight:800;font-size:34px;letter-spacing:1px;line-height:1}.ys .logo sup{font-size:9px;font-weight:400}.ys .lg{max-height:52px;max-width:260px}
-.ys .sub{letter-spacing:5px;font-size:9px;margin-top:6px}.ys .tag{letter-spacing:4px;font-size:9px;text-align:right;line-height:1.9;border-bottom:1px solid #fff;padding-bottom:8px}
-.ys .body{padding:18px 22px;flex:1;display:flex;flex-direction:column;gap:12px}
-.ys .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.ys h1{font-size:34px;font-weight:800;letter-spacing:1px}
-.ys .top p{letter-spacing:4px;color:#666;margin-top:4px;font-size:10px}
-.ys .box{background:#efefef;border-radius:6px;padding:12px 14px}.ys .oid{min-width:250px}.ys .oid b{display:block;font-size:15px;margin:3px 0 6px}
-.ys .lbl{font-size:8.5px;letter-spacing:1.5px;color:#333;text-transform:uppercase;font-weight:600}.ys .small{font-size:9px;color:#666;margin-top:4px}
-.ys .bar{height:38px;margin-top:2px}.ys .bar svg{height:38px;width:100%}
-.ys .strip{display:grid;grid-template-columns:repeat(4,1fr);padding:0}.ys .strip>div{padding:12px 14px;border-right:1px solid #d9d9d9}.ys .strip>div:last-child{border:0}
-.ys .strip b{display:block;font-size:12px;margin:4px 0 2px;white-space:normal;word-break:break-word}
-.ys .addr{display:grid;grid-template-columns:1fr 1fr .9fr}.ys .addr>div{padding:6px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
-.ys .addr>div:last-child{border:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.ys .addr b{display:block;font-size:12px;margin:3px 0}
-.ys .script{font-family:Caveat,cursive;font-size:24px;line-height:1.1;transform:rotate(-6deg)}
-.ys table{width:100%;border-collapse:collapse;background:#fafafa}
-.ys th{background:#0d0f10;color:#fff;font-size:8.5px;letter-spacing:1.5px;text-align:left;padding:10px 8px;text-transform:uppercase}
-.ys td{padding:10px 8px;border:1px solid #d9d9d9;vertical-align:middle}.ys .r{text-align:right}.ys .c{text-align:center}.ys .chk{font-size:15px;display:block}
-.ys .prod{display:flex;gap:10px;align-items:center}.ys .ph{width:56px;height:56px;background:#ddd;border-radius:3px;flex:none;object-fit:cover}
-.ys .prod b{display:block;font-size:11.5px;text-transform:uppercase}
-.ys.cp .ph{width:32px;height:32px}.ys.cp td{padding:4px 8px}.ys.cp .badges{display:none}.ys.cp .body{gap:8px;padding:12px 22px}.ys.cp .hd{padding:14px 34px}
-.ys .mid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;align-items:start}
-.ys .badges{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;gap:6px;padding-top:14px}
-.ys .badges div{font-size:8px;letter-spacing:1px;color:#333;text-transform:uppercase;line-height:1.5}.ys .badges span{display:block;font-size:20px;margin-bottom:4px}
-.ys .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #d9d9d9;font-size:10.5px}.ys .disc{color:#1c7a3c}
-.ys .grand{background:#0d0f10;color:#fff;border-radius:5px;padding:10px 12px;margin-top:6px;display:flex;justify-content:space-between;font-weight:800;font-size:16px}
-.ys .cod{border:2px dashed #000;border-radius:6px;padding:8px 12px;margin-top:8px;text-align:center}.ys .cod b{font-size:17px;display:block}
-.ys .hp .row,.ys .hp .grand,.ys .hp>.small{display:none}
-.ys .ntw{display:flex;gap:12px}.ys .nt{flex:1;background:#fff;border:1px solid #d9d9d9;border-radius:6px;padding:10px 14px;font-size:10.5px;line-height:1.5}
-.ys .nt.fr{background:#0d0f10;color:#fff;border-color:#0d0f10;font-weight:800;letter-spacing:1px}.ys .nt.fr .lbl{color:#ccc}
-.ys .promo{border:1.5px dashed #0d0f10;border-radius:6px;padding:9px 14px;text-align:center;font-weight:600;font-size:11.5px}
-.ys .info{display:grid;grid-template-columns:1.15fr 1.45fr .85fr;padding:0}.ys .info>div{padding:12px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
-.ys .info>div:last-child{border:0;display:flex;align-items:center;justify-content:center}
-.ys .qr{width:86px;height:86px;flex:none;background:#fff;padding:2px}.ys .qr img{width:100%;height:100%}.ys .trk{display:flex;gap:12px;align-items:center}
-.ys .notes{font-size:9px;color:#666;line-height:1.6;padding:0 4px}
-.ys .ft{background:#0d0f10;color:#fff;padding:14px 34px;display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:3px}
-.ys .ft .logo{font-size:17px;letter-spacing:.5px}.ys .ft .sub{font-size:6px;letter-spacing:3px;margin-top:2px}.ys .ft .w{letter-spacing:0;font-size:10px}
-.lb{width:384px;height:576px;background:#fff;color:#000;font:11px/1.35 Archivo,'Noto Sans Devanagari',Arial,sans-serif;border:2px solid #000;display:flex;flex-direction:column}
-.lb *{box-sizing:border-box;margin:0;padding:0}.lb .s{padding:8px 12px;border-bottom:2px solid #000}
-.lb .h{display:flex;justify-content:space-between;align-items:center;background:#000;color:#fff}.lb .h b{font-size:18px;letter-spacing:1px}
-.lb .t{font-size:9px;font-weight:600;letter-spacing:1px}.lb .nm{font-size:17px;font-weight:800;margin:2px 0}.lb .ad{font-size:12.5px;line-height:1.4}
-.lb .pin{font-size:20px;font-weight:800;letter-spacing:2px}.lb .bc{height:56px}.lb .bc svg{width:100%;height:56px}
-.lb .cd{text-align:center;font-size:22px;font-weight:800;padding:8px}.lb .cd.c{background:#000;color:#fff}.lb .g{display:flex;justify-content:space-between;gap:8px}
-.lb .f{margin-top:auto;border-top:2px solid #000;border-bottom:0}`;
-
-  /* ---------- templates ---------- */
-  async function slipHtml(o,kind,opt){
-    opt=opt||{};const S=SL(),l=opt.lang||o.slipLang||S.lang||'en',t=k=>T(l,k),inv=kind==='invoice',items=itemsOf(o),F=figures(o,items);
-    await Promise.all(items.map(async it=>it.img=await toDataUrl(it.image)));
-    const id=oid(o)||'—',isCOD=String(o.payment||'cod').toUpperCase()==='COD',date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
-    const A=addrLines(o).map(E).join('<br>'),name=E(o.customer||o.name||'—'),contact=E(o.phone||'')+(o.email?'<br>'+E(o.email):'');
-    const billingRaw=String(o.billingAddress||o.billing_address||'').trim(),billingSame=!billingRaw;
-    const billingHtml=billingSame?'<span class="small">Same as shipping address</span>':E(billingRaw).replace(/\n/g,'<br>');
-    const gift=o.gift||o.isGift,giftMsg=o.giftMessage||o.giftMsg||'',note=o.note||o.notes||o.customerNote||o.instructions||'',hidePrice=!inv&&!!(gift||o.hidePrice);
-    const nb=(a,b,c)=>`<div class="nt ${c||''}"><span class="lbl">${a}</span><div>${b}</div></div>`;
-    const extra=(o.fragile||giftMsg||note)?`<div class="ntw">${o.fragile?nb(t('frag'),t('fragt'),'fr'):''}${giftMsg?nb(t('gift'),E(giftMsg)):''}${note?nb(t('note'),E(note)):''}</div>`:'';
-    const track=o.tracking_url||S.trackUrl.replace('{id}',encodeURIComponent(id));
-    const [barSvg,qrImg]=await Promise.all([barOf(id,38),qrOf(track)]);
-    const P=v=>hidePrice?'—':inr(v);
-    const rows=items.map((it,n)=>`<tr><td class="c">${inv?'':'<span class="chk">☐</span>'}${n+1}</td><td><div class="prod">${it.img?`<img class="ph" src="${it.img}">`:'<div class="ph"></div>'}<div><b>${E(it.name)}</b>${E(it.desc)}</div></div></td><td class="c">${E(it.sku)}<div class="small">HSN ${E(it.hsn)}</div></td><td class="c"><b>${E(it.size)}${it.color?' / '+E(it.color):''}</b></td><td class="c">${it.qty}</td><td class="r">${P(it.price)}</td><td class="r"><b>${P(it.price*it.qty)}</b></td></tr>`).join('');
-    const qtyT=items.reduce((s,i)=>s+i.qty,0),logo=S.logo?`<img class="lg" src="${S.logo}">`:`<div class="logo">YOUR TYPE<sup>™</sup></div>`;
-    const social=S.social?E(S.social):'www.yourtype.in';
-    const promo=(!inv&&S.promo)?`<div class="promo">${E(S.promo)}</div>`:'';
-    const gstin=validGstin(S.gstin);
-    const foot=[gstin?'GSTIN: '+E(gstin):'',S.address?E(S.address):''].filter(Boolean).join(' &nbsp;|&nbsp; ');
-    const cls='ys'+(l==='hi'?' hi':'')+(items.length>2?' cp':'');
-    return `<div class="${cls}"><div class="hd"><div>${logo}<div class="sub">PREMIUM STREETWEAR</div></div><div class="tag">BETTER CLOTHES<br>BIGGER STORIES</div></div>
-<div class="body"><div class="top"><div><h1>${t(inv?'invoice':'slip')}</h1><p>${t('thanks')}</p><p style="letter-spacing:1px;font-size:11px">${t('items')}: ${qtyT}${o.weight?' &nbsp;|&nbsp; '+t('wt')+': '+E(o.weight):''}${inv?' &nbsp;|&nbsp; '+t('date')+': '+E(date):''}</p></div>
-<div class="box oid"><div class="lbl">${t('oid')}</div><b>${E(id)}</b><div class="bar">${barSvg}</div><div class="small">${t('scan')}</div></div></div>
-<div class="box strip"><div><span class="lbl">${t('odate')}</span><b>${E(date)}</b></div><div><span class="lbl">${t('pay')}</span><b>${isCOD?'COD':E(String(o.payment).toUpperCase())}</b><span class="small">${t(isCOD?'cod':'paid')}</span></div><div><span class="lbl">${t('status')}</span><b>${E(o.status||'New')}</b><span class="small">${o.status==='Packed'?t('ready'):''}</span></div><div><span class="lbl">${t('partner')}</span><b>${E(o.courier||t('tbd'))}</b><span class="small">${o.awb?'AWB: '+E(o.awb):t('soon')}</span></div></div>
-<div class="addr"><div><span class="lbl">${t('ship')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><span class="lbl">${t('bill')}</span><b>${billingSame?'Same as shipping':name}</b>${billingHtml}${billingSame?'':'<br><br>'+contact}</div><div><div class="script">${t('ty1')}<br>${t('ty2')}</div><div class="small" style="margin-top:10px">— YOUR TYPE —</div></div></div>
-<table><thead><tr><th class="c">${t('sno')}</th><th>${t('prod')}</th><th class="c">${t('sku')}</th><th class="c">${t('size')}</th><th class="c">${t('qty')}</th><th class="r">${t('unit')}</th><th class="r">${t('total')}</th></tr></thead><tbody>${rows}</tbody></table>${extra}
-<div class="mid">${S.badges?`<div class="badges"><div><span>✔</span>${t('q1')}</div><div><span>🚚</span>${t('q2')}</div><div><span>♻</span>${t('q3')}</div><div><span>☎</span>${t('q4')}</div></div>`:'<div></div>'}
-<div class="box${hidePrice?' hp':''}"><div class="row"><span>${t('sub')}</span><b>${inr(F.sub)}</b></div><div class="row"><span>${t('shp')}</span><b>${F.ship?inr(F.ship):t('free')}</b></div>${F.disc?`<div class="row disc"><span>${t('disc')}${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(F.disc)}</b></div>`:''}<div class="row"><span>${t('gst')} ${F.rate}%)</span><b>${inr(F.gst)}</b></div><div class="grand"><span>${t('total').toUpperCase()}</span><span>${inr(F.total)}</span></div><div class="small">(${t('incl')} ${F.gst} @ ${F.rate}%)</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">${t('collect')}</span><b>${inr(F.total)}</b></div>`:`<div class="cod"><b>${t('prepaid')}</b></div>`):''}</div></div>${promo}
-<div class="box info"><div><div class="trk">${qrImg?`<div class="qr"><img src="${qrImg}"></div>`:''}<div><span class="lbl">${t('track')}</span><div class="small">${t('visit')}<br><b style="color:#000">${E(S.trackUrl.replace(/^https?:\/\//,'').split('?')[0])}</b></div></div></div></div><div><span class="lbl">${t('shipto')}</span><b style="display:block">${name}</b>${E(addrLines(o).join(', '))}<br>${E(o.phone||'')}</div><div><div class="script">Built for<br>Real Ones</div><div class="small" style="margin-top:8px">YOUR TYPE • PREMIUM STREETWEAR</div></div></div>
-<div class="notes"><b>${t('sold')}:</b> ${E(S.name)}${foot?' &nbsp;|&nbsp; '+foot:''}<br>${E(S.policy)}${(S.email||S.phone)?' ${t("help")}: '.replace('${t("help")}',t('help'))+E([S.email,S.phone].filter(Boolean).join(' | ')):''}${!inv?`<br><br>${t('packed')}: ____________ &nbsp;&nbsp; ${t('checked')}: ____________ &nbsp;&nbsp; ${t('date')}: ____________`:''}<br>${t('comp')}</div></div>
-<div class="ft"><div><div class="logo">YOUR TYPE™</div><div class="sub">PREMIUM STREETWEAR</div></div><div>THANK YOU &nbsp;/&nbsp; STAY STYLISH</div><div class="w">${social}</div></div></div>`;
-  }
-  async function labelHtml(o,opt){
-    opt=opt||{};const S=SL(),l=opt.lang||o.slipLang||S.lang||'en',t=k=>T(l,k),items=itemsOf(o),F=figures(o,items),id=oid(o)||'—',isCOD=String(o.payment||'cod').toUpperCase()==='COD';
-    const code=o.awb||id,bar=await barOf(code,56),A=addrLines(o),pin=(String(o.pin||(A.join(' ').match(/\b\d{6}\b/)||[''])[0])),qty=items.reduce((s,i)=>s+i.qty,0);
-    const line=items.map(i=>`${E(i.sku)} x${i.qty} (${E(i.size)})`).join(', ');
-    return `<div class="lb"><div class="s h"><b>${E(S.name).toUpperCase()}</b><span class="t">${E(o.courier||'COURIER')}</span></div>
-<div class="s"><div class="t">${t('to')}</div><div class="nm">${E(o.customer||o.name||'')}</div><div class="ad">${E(A[0]||'')}<br>${E(A.slice(1).join(', '))}</div><div class="pin">${E(pin)}</div><div class="ad">📞 ${E(o.phone||'')}</div></div>
-<div class="s"><div class="bc">${bar}</div><div class="g"><b>${t('awb')}: ${E(o.awb||'—')}</b><span class="t">${E(id)}</span></div></div>
-<div class="cd ${isCOD?'c':''}">${isCOD?'COD: '+inr(F.total):'PREPAID'}</div>
-<div class="s" style="font-size:10.5px"><div class="g"><span>${t('items')}: ${qty}${o.weight?' | '+t('wt')+': '+E(o.weight):''}</span><span>${o.date?E(new Date(o.date).toLocaleDateString('en-IN')):''}</span></div><div>${line}</div>${o.fragile?'<b>⚠ '+t('fragt')+'</b>':''}</div>
-<div class="s f" style="font-size:10px"><div class="t">${t('from')}</div><b>${E(S.name)}</b> ${E(S.address)} ${S.phone?'| '+E(S.phone):''}${validGstin(S.gstin)?'<br>GSTIN: '+E(validGstin(S.gstin)):''}</div></div>`;
-  }
-
-  /* ---------- output ---------- */
-  const SPEC={slip:{w:210,h:297,px:1123,page:'A4'},invoice:{w:210,h:297,px:1123,page:'A4'},label:{w:101.6,h:152.4,px:576,page:'4in 6in'}};
-  const stamp=(o,k)=>{const f=k==='label'?'labelPrints':'slipPrints';o[f]=(o[f]||0)+1};
-  /* ---- server sync (database): options, slip settings and print counts live on the server ---- */
-  const oKey=o=>o.serverOrderId||o.orderId||o.id;
-  async function sapi(path,method,body){
-    const r=await fetch(path,{method:method||'GET',headers:adminHeaders(),body:body?JSON.stringify(body):undefined});
-    let j={};try{j=await r.json()}catch(_){}
-    if(!r.ok)throw new Error(j.error||('Server error '+r.status));
-    return j;
-  }
-  async function pull(){
-    try{
-      const d=await sapi('/api/admin/slip-data');
-      state.settings=state.settings||{};
-      if(d.settings&&Object.keys(d.settings).length)state.settings.slip=Object.assign({},state.settings.slip||{},d.settings);
-      (state.orders||[]).forEach(o=>{const x=(d.orders||{})[oKey(o)];if(x)Object.assign(o,x)});
-      save();return true;
-    }catch(e){console.warn('slip data not loaded from server:',e.message);return false}
-  }
-  async function afterPrint(orders,kind){
-    orders.forEach(o=>stamp(o,kind));
-    try{const r=await sapi('/api/admin/slip-print','POST',{ids:orders.map(oKey),kind});
-      orders.forEach(o=>{const c=(r.counts||{})[oKey(o)];if(c){o.slipPrints=c.slipPrints;o.labelPrints=c.labelPrints}})}catch(e){console.warn('print count not saved on server:',e.message)}
-    save();
-  }
-  async function build(o,kind,opt){return kind==='label'?labelHtml(o,opt):slipHtml(o,kind,opt)}
-  async function generate(ids,kind,opt){
-    await pull();ids=[].concat(ids);const orders=ids.map(findOrder).filter(Boolean);
-    if(!orders.length){toast('Order not found');return}
-    toast('Preparing PDF…');loadFont();
-    const sp=SPEC[kind],fname='YOUR_TYPE_'+({slip:'PACKING_SLIP_',invoice:'INVOICE_',label:'LABEL_'}[kind])+(orders.length>1?'BULK_'+orders.length:safeFile(oid(orders[0])));
-    let step='html';
-    try{
-      const htmls=[];for(const o of orders)htmls.push(await build(o,kind,opt));
-      step='libs';const ok=await Promise.all([lib('h2c',()=>window.html2canvas),lib('pdf',()=>window.jspdf&&window.jspdf.jsPDF)]);
-      if(!ok[0]||!ok[1])throw new Error('PDF library could not load (check internet)');
-      step='render';const {jsPDF}=window.jspdf;let pdf=null;
-      const host=document.createElement('div');host.style.cssText='position:fixed;left:0;top:0;z-index:-1;pointer-events:none';document.body.appendChild(host);
-      try{await document.fonts.ready}catch(_){}
-      for(let i=0;i<htmls.length;i++){
-        host.innerHTML='<style>'+CSS+'.ys{min-height:'+sp.px+'px}</style>'+htmls[i];await new Promise(r=>setTimeout(r,200));
-        const node=host.firstElementChild.nextElementSibling;
-        const cv=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
-        if(!pdf)pdf=new jsPDF({orientation:'portrait',unit:'mm',format:[sp.w,sp.h],compress:true});else pdf.addPage([sp.w,sp.h],'portrait');
-        let w=sp.w,h=sp.w*cv.height/cv.width;if(h>sp.h){w=sp.w*sp.h/h;h=sp.h}
-        pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',(sp.w-w)/2,0,w,h);
-      }
-      host.remove();step='save';pdf.save(fname+'.pdf');
-      await afterPrint(orders,kind);toast((orders.length>1?orders.length+' PDFs':'PDF')+' downloaded');
-    }catch(e){
-      console.error('PDF failed at '+step,e);
-      try{
-        const htmls=[];for(const o of orders)htmls.push(await build(o,kind,opt));
-        const w=window.open('','_blank');if(!w){toast('Popup blocked - allow popups (error: '+step+')');return}
-        const pr=kind==='label'?'@page{size:4in 6in;margin:0}.lb{page-break-after:always}':'@page{size:A4;margin:0}.ys{width:100%!important;min-height:1040px;page-break-after:always}';
-        w.document.write('<!doctype html><meta name="viewport" content="width=device-width"><title>'+fname+'</title><link href="'+FONT+'" rel="stylesheet"><style>body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+pr+CSS+'</style>'+htmls.join('')+'<script>setTimeout(function(){document.querySelectorAll(".ys").forEach(function(n){var H=1040;if(n.scrollHeight>H)n.style.zoom=H/n.scrollHeight});print()},900)<\/script>');
-        w.document.close();await afterPrint(orders,kind);toast('Print view opened - Save as PDF (reason: '+step+': '+(e&&e.message||e)+')');
-      }catch(err){console.error(err);toast('Unable to create PDF')}
-    }
-  }
-
-  /* ---------- preview ---------- */
-  let pv={};
-  async function preview(id,kind,lang){
-    await pull();const o=findOrder(id);if(!o)return;pv={id,kind,lang};loadFont();toast('Loading preview…');
-    const h=await build(o,kind,{lang}),sp=SPEC[kind],pw=kind==='label'?384:794,z=Math.min(1,(window.innerWidth-56)/pw);
-    const cnt=(o.slipPrints||0),lc=(o.labelPrints||0),q=String(id).replace(/'/g,"\\'");
-    openModal(`<h3 style="margin-bottom:8px">Preview - ${kind==='label'?'Shipping Label 4x6':kind==='invoice'?'Invoice':'Packing Slip'}</h3>
-<p class="muted" style="margin-bottom:8px">Slips printed: <b>${cnt}</b> · Labels printed: <b>${lc}</b></p>
-<div style="margin-bottom:10px"><button class="btn primary" onclick="ytGen('${q}','${kind}',pv.lang)">Download PDF</button> <button class="btn" onclick="ytPreview('${q}','${kind}','${lang==='hi'?'en':'hi'}')">${lang==='hi'?'English':'हिंदी'}</button></div>
-<div style="overflow:auto;background:#888;padding:8px;border-radius:8px"><div style="zoom:${z};width:${pw}px"><style>${CSS}.ys{min-height:${sp.px}px}</style>${h}</div></div>`);
-  }
-
-  /* ---------- order options ---------- */
-  async function orderOpts(id){
-    await pull();const o=findOrder(id);if(!o)return;const q=String(id).replace(/'/g,"\\'"),ck=v=>v?'checked':'';
-    openModal(`<h3>Slip Options - ${E(oid(o))}</h3><p class="muted">Ye sirf is order ki slip par lagega.</p>
-<label><input type=checkbox id=soGift ${ck(o.gift)}> Gift order (slip par price chhupao)</label><br>
-<label><input type=checkbox id=soFrag ${ck(o.fragile)}> Fragile - sambhal ke pack karo</label><br>
-<label><input type=checkbox id=soHide ${ck(o.hidePrice)}> Price hide karo</label><br><br>
-<input id=soGm placeholder="Gift message" value="${E(o.giftMessage||'')}"><br><br>
-<textarea id=soNote placeholder="Order note / customer instruction" rows=3 style="width:100%">${E(o.note||'')}</textarea><br><br>
-<input id=soWt placeholder="Weight (e.g. 0.6 kg)" value="${E(o.weight||'')}"><br><br>
-<select id=soLang><option value="">Default language</option><option value="en" ${o.slipLang==='en'?'selected':''}>English</option><option value="hi" ${o.slipLang==='hi'?'selected':''}>हिंदी</option></select><br><br>
-<p class="muted">Slips printed: ${o.slipPrints||0} · Labels printed: ${o.labelPrints||0}</p>
-<button class="btn primary" onclick="ytSaveOpts('${q}')">Save</button>`);
-  }
-  async function saveOpts(id){
-    const o=findOrder(id),g=x=>document.getElementById(x);if(!o)return;
-    o.gift=g('soGift').checked;o.fragile=g('soFrag').checked;o.hidePrice=g('soHide').checked;o.giftMessage=g('soGm').value.trim();o.note=g('soNote').value.trim();o.weight=g('soWt').value.trim();o.slipLang=g('soLang').value;
-    save();closeModal();
-    try{await sapi('/api/admin/orders/'+encodeURIComponent(oKey(o)),'PATCH',{gift:o.gift,fragile:o.fragile,hidePrice:o.hidePrice,giftMessage:o.giftMessage,note:o.note,weight:o.weight,slipLang:o.slipLang});toast('Slip options saved (database)')}
-    catch(e){toast('Saved on this device only: '+e.message)}
-  }
-
-  /* ---------- store slip settings ---------- */
-  async function settingsModal(){
-    await pull();const S=SL(),f=(k,ph,v)=>`<input id="ss_${k}" placeholder="${ph}" value="${E(v)}"><br><br>`;
-    openModal(`<h3>Slip Settings</h3><p class="muted">Ye sab packing slip, invoice aur label par aayega.</p>
-${f('name','Store name',S.name)}${f('gstin','GSTIN',S.gstin)}${f('address','Return address',S.address)}${f('phone','Support phone',S.phone)}${f('email','Support email',S.email)}
-<textarea id="ss_policy" rows=3 style="width:100%" placeholder="Return policy text">${E(S.policy)}</textarea><br><br>
-${f('promo','Promo line (e.g. Next order par 10% off - code THANKS10)',S.promo)}${f('social','Social handle / website (footer)',S.social)}
-${f('returnUrl','Return page link ({id} = order id). Khali = QR nahi',S.returnUrl)}${f('trackUrl','Tracking page link ({id} = order id)',S.trackUrl)}
-<label>Logo <input type=file id="ss_logo" accept="image/*"></label> ${S.logo?'<label><input type=checkbox id="ss_rmlogo"> Logo hatao</label>':''}<br><br>
-<select id="ss_lang"><option value="en" ${S.lang==='en'?'selected':''}>English</option><option value="hi" ${S.lang==='hi'?'selected':''}>हिंदी</option></select>
-<label style="margin-left:10px"><input type=checkbox id="ss_badges" ${S.badges?'checked':''}> Quality badges dikhao</label><br><br>
-<button class="btn primary" onclick="ytSaveSettings()">Save</button>`);
-  }
-  async function saveSettings(){
-    const g=x=>document.getElementById(x),n=Object.assign({},SL());
-    ['name','gstin','address','phone','email','policy','promo','social','returnUrl','trackUrl','lang'].forEach(k=>n[k]=g('ss_'+k).value.trim());
-    n.badges=g('ss_badges').checked;if(g('ss_rmlogo')&&g('ss_rmlogo').checked)n.logo='';
-    const fl=g('ss_logo').files[0];
-    if(fl){n.logo=await new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,400/im.width),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/png'))};im.onerror=()=>res(n.logo);im.src=r.result};r.onerror=()=>res(n.logo);r.readAsDataURL(fl)})}
-    state.settings=state.settings||{};state.settings.slip=n;save();closeModal();
-    try{await sapi('/api/admin/slip-settings','PATCH',n);toast('Slip settings saved (database)')}
-    catch(e){toast('Saved on this device only: '+e.message)}
-  }
-
-  /* ---------- selection + bulk ---------- */
-  const sel=new Set();
-  function bar(){let b=document.getElementById('ytBulk');
-    if(!sel.size){if(b)b.remove();return}
-    if(!b){b=document.createElement('div');b.id='ytBulk';b.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#111;color:#fff;border:1px solid #444;border-radius:12px;padding:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center';document.body.appendChild(b)}
-    b.innerHTML=`<b>${sel.size} selected</b><button class="btn primary" onclick="ytBulkGen('slip')">Slips PDF</button><button class="btn" onclick="ytBulkGen('label')">Labels PDF</button><button class="btn" onclick="ytClearSel()">Clear</button>`}
-  window.ytPick=(id,on)=>{on?sel.add(String(id)):sel.delete(String(id));bar()};
-  window.ytClearSel=()=>{sel.clear();bar();try{renderOrders();renderCustomerOrders()}catch(_){}};
-  window.ytBulkGen=k=>generate([...sel],k);
-  const jq=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  window.ytSelBox=id=>`<label style="display:inline-flex;gap:6px;align-items:center;margin:0 10px 8px 0"><input type=checkbox ${sel.has(String(id))?'checked':''} onchange="ytPick('${jq(id)}',this.checked)"> Select</label>`;
-  window.ytBtns=id=>{const q=jq(id);return `<button class="btn" onclick="ytPreview('${q}','slip')">👁 Preview Slip</button><button class="btn" onclick="ytGen('${q}','label')">🏷 Label 4x6</button><button class="btn" onclick="ytOpts('${q}')">⚙ Slip Options</button>`};
-
-  window.ytGen=(id,k,lang)=>generate(id,k,{lang});window.ytPreview=preview;window.ytOpts=orderOpts;window.ytSaveOpts=saveOpts;window.ytSaveSettings=saveSettings;window.ytSlipSettings=settingsModal;
-  window.addressSlip=id=>generate(id,'slip');window.invoiceById=id=>generate(id,'invoice');window.shippingLabel=id=>generate(id,'label');
-  try{const m=document.querySelector('#settings .menu');if(m&&!document.getElementById('ytSlipBox')){const d=document.createElement('div');d.className='box';d.id='ytSlipBox';d.innerHTML='<b>Slip Settings</b><p class="muted">Logo, GSTIN, return address, policy, promo, language.</p><button class="btn" onclick="ytSlipSettings()">Manage</button>';m.appendChild(d)}}catch(_){}
-})();
-</script>
-
-</body></html>
+<script src="/music-player.js" defer></script></body></html>

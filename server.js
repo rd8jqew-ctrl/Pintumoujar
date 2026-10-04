@@ -130,7 +130,7 @@ async function enrichYouTubeMusic(videoId,x){
 
 
 // ===== Order automation helpers: auto AWB, Razorpay, email =====
-function trackingLinkFor(courier,awb){const a=encodeURIComponent(awb||''),c=String(courier||'').toLowerCase();if(!awb)return '';if(c==='delhivery')return 'https://www.delhivery.com/track/package/'+a;if(c==='shiprocket')return 'https://shiprocket.co/tracking/'+a;return ''}
+function trackingLinkFor(courier,awb){const a=encodeURIComponent(awb||''),c=String(courier||'').toLowerCase();if(!awb)return '';if(c==='delhivery')return 'https://www.delhivery.com/tracking';if(c==='shiprocket')return 'https://shiprocket.co/tracking/'+a;return ''}
 // Creates an AWB automatically once an order is Packed (or later). In TEST_MODE this is a fake AWB.
 // When Shiprocket is connected, replace the TEST block with a Shiprocket API call that returns a real AWB.
 function ensureAwb(o){
@@ -138,7 +138,7 @@ function ensureAwb(o){
   if(!TEST_MODE)return false;
   o.awb='TEST'+String(crypto.randomInt(0,1e9)).padStart(9,'0');
   if(!o.courier)o.courier='Delhivery';
-  if(!o.tracking_url)o.tracking_url=trackingLinkFor(o.courier,o.awb);
+  const generatedTracking=trackingLinkFor(o.courier,o.awb);if(generatedTracking&&(!o.tracking_url||/delhivery\.com\/track\/package\//i.test(String(o.tracking_url))))o.tracking_url=generatedTracking;
   audit('awb.auto',{orderId:o.orderId,awb:o.awb,test:true});
   return true;
 }
@@ -288,7 +288,7 @@ async function api(req,res,p){
     }else if(ev.event==='payment.failed'){audit('payment.failed',{orderId:pay.notes?.orderId||'',reason:String(pay.error_description||'').slice(0,120)})}
     save(db);return send(res,200,{ok:true},'application/json',origin);
   }
-  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)).trim(),key=id.toUpperCase(),o=db.orders.find(v=>v.orderId===id||String(v.orderId).toUpperCase()===key||(v.awb&&String(v.awb).toUpperCase()===key));if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items,payment:o.payment,awb:o.awb||'',courier:o.courier||'',trackingUrl:o.tracking_url||trackingLinkFor(o.courier,o.awb)},'application/json',origin)}
+  if(req.method==='GET'&&p.startsWith('/api/orders/')){const id=decodeURIComponent(p.slice('/api/orders/'.length)).trim(),key=id.toUpperCase(),o=db.orders.find(v=>v.orderId===id||String(v.orderId).toUpperCase()===key||(v.awb&&String(v.awb).toUpperCase()===key));if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);const generatedTracking=trackingLinkFor(o.courier,o.awb);return send(res,200,{orderId:o.orderId,status:o.status,date:o.date,total:o.total,items:o.items,payment:o.payment,awb:o.awb||'',courier:o.courier||'',trackingUrl:generatedTracking||o.tracking_url||''},'application/json',origin)}
 
   if(req.method==='GET'&&p==='/api/music/current'){
     const m=db.music||{};

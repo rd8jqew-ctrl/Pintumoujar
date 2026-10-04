@@ -1677,7 +1677,8 @@ async function restoreServerBackup(){
   const STATES={560:'Karnataka',110:'Delhi',400:'Maharashtra',600:'Tamil Nadu',500:'Telangana',700:'West Bengal',380:'Gujarat',302:'Rajasthan',201:'Uttar Pradesh',226:'Uttar Pradesh'};
   function addrLines(o){const a=String(o.address||'').replace(/\s+/g,' ').trim(),pin=String(o.pin||(a.match(/\b\d{6}\b/)||[''])[0]).trim(),st=o.state||STATES[pin.slice(0,3)]||'';
     return [a,[o.city,pin].filter(Boolean).join(' - '),st?st+', India':'India'].filter(Boolean)}
-  async function qrOf(text){if(!(await lib('qr',()=>window.QRCode)))return'';try{const h=document.createElement('div');h.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(h);new QRCode(h,{text:String(text),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});await new Promise(r=>setTimeout(r,120));const c=h.querySelector('canvas'),u=c?c.toDataURL('image/png'):'';h.remove();return u}catch(_){return''}}
+  function validGstin(v){const x=String(v||'').trim().toUpperCase();return /^[0-9A-Z]{15}$/.test(x)&&/[A-Z]/.test(x)&&/[0-9]/.test(x)?x:''}
+  async function qrOf(text){if(!(await lib('qr',()=>window.QRCode)))return'';try{const h=document.createElement('div');h.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(h);new QRCode(h,{text:String(text),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});await new Promise(r=>setTimeout(r,120));const c=h.querySelector('canvas'),im=h.querySelector('img');let u=c?c.toDataURL('image/png'):(im&&im.src?im.src:'');h.remove();return u}catch(_){return''}}
   async function barOf(text,h){if(!(await lib('bar',()=>window.JsBarcode)))return'';try{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(s,String(text),{format:'CODE128',displayValue:false,height:h,margin:0,width:1.6});s.setAttribute('preserveAspectRatio','none');return s.outerHTML}catch(_){return''}}
   function figures(o,items){const sub=num(o.subtotal)||items.reduce((s,i)=>s+i.price*i.qty,0),disc=num(o.discount),ship=num(o.shipping),rate=num(o.gstRate)||num(state.settings?.gst)||5,total=num(o.total)||Math.max(0,sub-disc)+ship,gst=num(o.gst)||Math.round(Math.max(0,sub-disc)*rate/(100+rate));return{sub,disc,ship,rate,total,gst}}
 
@@ -1694,7 +1695,7 @@ async function restoreServerBackup(){
 .ys .lbl{font-size:8.5px;letter-spacing:1.5px;color:#333;text-transform:uppercase;font-weight:600}.ys .small{font-size:9px;color:#666;margin-top:4px}
 .ys .bar{height:38px;margin-top:2px}.ys .bar svg{height:38px;width:100%}
 .ys .strip{display:grid;grid-template-columns:repeat(4,1fr);padding:0}.ys .strip>div{padding:12px 14px;border-right:1px solid #d9d9d9}.ys .strip>div:last-child{border:0}
-.ys .strip b{display:block;font-size:12.5px;margin:4px 0 2px}
+.ys .strip b{display:block;font-size:12px;margin:4px 0 2px;white-space:normal;word-break:break-word}
 .ys .addr{display:grid;grid-template-columns:1fr 1fr .9fr}.ys .addr>div{padding:6px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
 .ys .addr>div:last-child{border:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.ys .addr b{display:block;font-size:12px;margin:3px 0}
 .ys .script{font-family:Caveat,cursive;font-size:24px;line-height:1.1;transform:rotate(-6deg)}
@@ -1714,9 +1715,9 @@ async function restoreServerBackup(){
 .ys .ntw{display:flex;gap:12px}.ys .nt{flex:1;background:#fff;border:1px solid #d9d9d9;border-radius:6px;padding:10px 14px;font-size:10.5px;line-height:1.5}
 .ys .nt.fr{background:#0d0f10;color:#fff;border-color:#0d0f10;font-weight:800;letter-spacing:1px}.ys .nt.fr .lbl{color:#ccc}
 .ys .promo{border:1.5px dashed #0d0f10;border-radius:6px;padding:9px 14px;text-align:center;font-weight:600;font-size:11.5px}
-.ys .info{display:grid;grid-template-columns:1.2fr 1.4fr 1fr;padding:0}.ys .info>div{padding:12px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
+.ys .info{display:grid;grid-template-columns:1.15fr 1.45fr .85fr;padding:0}.ys .info>div{padding:12px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
 .ys .info>div:last-child{border:0;display:flex;align-items:center;justify-content:center}
-.ys .qr{width:74px;height:74px;flex:none;background:#fff;padding:2px}.ys .qr img{width:100%;height:100%}.ys .trk{display:flex;gap:12px;align-items:center}
+.ys .qr{width:86px;height:86px;flex:none;background:#fff;padding:2px}.ys .qr img{width:100%;height:100%}.ys .trk{display:flex;gap:12px;align-items:center}
 .ys .notes{font-size:9px;color:#666;line-height:1.6;padding:0 4px}
 .ys .ft{background:#0d0f10;color:#fff;padding:14px 34px;display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:3px}
 .ys .ft .logo{font-size:17px;letter-spacing:.5px}.ys .ft .sub{font-size:6px;letter-spacing:3px;margin-top:2px}.ys .ft .w{letter-spacing:0;font-size:10px}
@@ -1734,27 +1735,30 @@ async function restoreServerBackup(){
     await Promise.all(items.map(async it=>it.img=await toDataUrl(it.image)));
     const id=oid(o)||'—',isCOD=String(o.payment||'cod').toUpperCase()==='COD',date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
     const A=addrLines(o).map(E).join('<br>'),name=E(o.customer||o.name||'—'),contact=E(o.phone||'')+(o.email?'<br>'+E(o.email):'');
+    const billingRaw=String(o.billingAddress||o.billing_address||'').trim(),billingSame=!billingRaw;
+    const billingHtml=billingSame?'<span class="small">Same as shipping address</span>':E(billingRaw).replace(/\n/g,'<br>');
     const gift=o.gift||o.isGift,giftMsg=o.giftMessage||o.giftMsg||'',note=o.note||o.notes||o.customerNote||o.instructions||'',hidePrice=!inv&&!!(gift||o.hidePrice);
     const nb=(a,b,c)=>`<div class="nt ${c||''}"><span class="lbl">${a}</span><div>${b}</div></div>`;
     const extra=(o.fragile||giftMsg||note)?`<div class="ntw">${o.fragile?nb(t('frag'),t('fragt'),'fr'):''}${giftMsg?nb(t('gift'),E(giftMsg)):''}${note?nb(t('note'),E(note)):''}</div>`:'';
     const track=o.tracking_url||S.trackUrl.replace('{id}',encodeURIComponent(id));
-    const [barSvg,qrImg,retImg]=await Promise.all([barOf(id,38),qrOf(track),(!inv&&S.returnUrl)?qrOf(S.returnUrl.replace('{id}',encodeURIComponent(id))):'']);
+    const [barSvg,qrImg]=await Promise.all([barOf(id,38),qrOf(track)]);
     const P=v=>hidePrice?'—':inr(v);
     const rows=items.map((it,n)=>`<tr><td class="c">${inv?'':'<span class="chk">☐</span>'}${n+1}</td><td><div class="prod">${it.img?`<img class="ph" src="${it.img}">`:'<div class="ph"></div>'}<div><b>${E(it.name)}</b>${E(it.desc)}</div></div></td><td class="c">${E(it.sku)}<div class="small">HSN ${E(it.hsn)}</div></td><td class="c"><b>${E(it.size)}${it.color?' / '+E(it.color):''}</b></td><td class="c">${it.qty}</td><td class="r">${P(it.price)}</td><td class="r"><b>${P(it.price*it.qty)}</b></td></tr>`).join('');
     const qtyT=items.reduce((s,i)=>s+i.qty,0),logo=S.logo?`<img class="lg" src="${S.logo}">`:`<div class="logo">YOUR TYPE<sup>™</sup></div>`;
     const social=S.social?E(S.social):'www.yourtype.in';
     const promo=(!inv&&S.promo)?`<div class="promo">${E(S.promo)}</div>`:'';
-    const foot=[S.gstin?'GSTIN: '+E(S.gstin):'',S.address?E(S.address):''].filter(Boolean).join(' &nbsp;|&nbsp; ');
+    const gstin=validGstin(S.gstin);
+    const foot=[gstin?'GSTIN: '+E(gstin):'',S.address?E(S.address):''].filter(Boolean).join(' &nbsp;|&nbsp; ');
     const cls='ys'+(l==='hi'?' hi':'')+(items.length>2?' cp':'');
     return `<div class="${cls}"><div class="hd"><div>${logo}<div class="sub">PREMIUM STREETWEAR</div></div><div class="tag">BETTER CLOTHES<br>BIGGER STORIES</div></div>
 <div class="body"><div class="top"><div><h1>${t(inv?'invoice':'slip')}</h1><p>${t('thanks')}</p><p style="letter-spacing:1px;font-size:11px">${t('items')}: ${qtyT}${o.weight?' &nbsp;|&nbsp; '+t('wt')+': '+E(o.weight):''}${inv?' &nbsp;|&nbsp; '+t('date')+': '+E(date):''}</p></div>
 <div class="box oid"><div class="lbl">${t('oid')}</div><b>${E(id)}</b><div class="bar">${barSvg}</div><div class="small">${t('scan')}</div></div></div>
 <div class="box strip"><div><span class="lbl">${t('odate')}</span><b>${E(date)}</b></div><div><span class="lbl">${t('pay')}</span><b>${isCOD?'COD':E(String(o.payment).toUpperCase())}</b><span class="small">${t(isCOD?'cod':'paid')}</span></div><div><span class="lbl">${t('status')}</span><b>${E(o.status||'New')}</b><span class="small">${o.status==='Packed'?t('ready'):''}</span></div><div><span class="lbl">${t('partner')}</span><b>${E(o.courier||t('tbd'))}</b><span class="small">${o.awb?'AWB: '+E(o.awb):t('soon')}</span></div></div>
-<div class="addr"><div><span class="lbl">${t('ship')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><span class="lbl">${t('bill')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><div class="script">${t('ty1')}<br>${t('ty2')}</div><div class="small" style="margin-top:10px">— YOUR TYPE —</div></div></div>
+<div class="addr"><div><span class="lbl">${t('ship')}</span><b>${name}</b>${A}<br><br>${contact}</div><div><span class="lbl">${t('bill')}</span><b>${billingSame?'Same as shipping':name}</b>${billingHtml}${billingSame?'':'<br><br>'+contact}</div><div><div class="script">${t('ty1')}<br>${t('ty2')}</div><div class="small" style="margin-top:10px">— YOUR TYPE —</div></div></div>
 <table><thead><tr><th class="c">${t('sno')}</th><th>${t('prod')}</th><th class="c">${t('sku')}</th><th class="c">${t('size')}</th><th class="c">${t('qty')}</th><th class="r">${t('unit')}</th><th class="r">${t('total')}</th></tr></thead><tbody>${rows}</tbody></table>${extra}
 <div class="mid">${S.badges?`<div class="badges"><div><span>✔</span>${t('q1')}</div><div><span>🚚</span>${t('q2')}</div><div><span>♻</span>${t('q3')}</div><div><span>☎</span>${t('q4')}</div></div>`:'<div></div>'}
 <div class="box${hidePrice?' hp':''}"><div class="row"><span>${t('sub')}</span><b>${inr(F.sub)}</b></div><div class="row"><span>${t('shp')}</span><b>${F.ship?inr(F.ship):t('free')}</b></div>${F.disc?`<div class="row disc"><span>${t('disc')}${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(F.disc)}</b></div>`:''}<div class="row"><span>${t('gst')} ${F.rate}%)</span><b>${inr(F.gst)}</b></div><div class="grand"><span>${t('total').toUpperCase()}</span><span>${inr(F.total)}</span></div><div class="small">(${t('incl')} ${F.gst} @ ${F.rate}%)</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">${t('collect')}</span><b>${inr(F.total)}</b></div>`:`<div class="cod"><b>${t('prepaid')}</b></div>`):''}</div></div>${promo}
-<div class="box info"><div><div class="trk">${qrImg?`<div class="qr"><img src="${qrImg}"></div>`:''}<div><span class="lbl">${t('track')}</span><div class="small">${t('visit')}<br><b style="color:#000">${E(S.trackUrl.replace(/^https?:\/\//,'').split('?')[0])}</b></div></div></div></div><div><span class="lbl">${t('shipto')}</span><b style="display:block">${name}</b>${E(addrLines(o).join(', '))}<br>${E(o.phone||'')}</div><div>${retImg?`<div class="trk"><div class="qr"><img src="${retImg}"></div><div><span class="lbl">${t('ret')}</span><div class="small">${t('retd')}</div></div></div>`:`<div class="script">Built for<br>Real Ones</div>`}</div></div>
+<div class="box info"><div><div class="trk">${qrImg?`<div class="qr"><img src="${qrImg}"></div>`:''}<div><span class="lbl">${t('track')}</span><div class="small">${t('visit')}<br><b style="color:#000">${E(S.trackUrl.replace(/^https?:\/\//,'').split('?')[0])}</b></div></div></div></div><div><span class="lbl">${t('shipto')}</span><b style="display:block">${name}</b>${E(addrLines(o).join(', '))}<br>${E(o.phone||'')}</div><div><div class="script">Built for<br>Real Ones</div><div class="small" style="margin-top:8px">YOUR TYPE • PREMIUM STREETWEAR</div></div></div>
 <div class="notes"><b>${t('sold')}:</b> ${E(S.name)}${foot?' &nbsp;|&nbsp; '+foot:''}<br>${E(S.policy)}${(S.email||S.phone)?' ${t("help")}: '.replace('${t("help")}',t('help'))+E([S.email,S.phone].filter(Boolean).join(' | ')):''}${!inv?`<br><br>${t('packed')}: ____________ &nbsp;&nbsp; ${t('checked')}: ____________ &nbsp;&nbsp; ${t('date')}: ____________`:''}<br>${t('comp')}</div></div>
 <div class="ft"><div><div class="logo">YOUR TYPE™</div><div class="sub">PREMIUM STREETWEAR</div></div><div>THANK YOU &nbsp;/&nbsp; STAY STYLISH</div><div class="w">${social}</div></div></div>`;
   }
@@ -1767,7 +1771,7 @@ async function restoreServerBackup(){
 <div class="s"><div class="bc">${bar}</div><div class="g"><b>${t('awb')}: ${E(o.awb||'—')}</b><span class="t">${E(id)}</span></div></div>
 <div class="cd ${isCOD?'c':''}">${isCOD?'COD: '+inr(F.total):'PREPAID'}</div>
 <div class="s" style="font-size:10.5px"><div class="g"><span>${t('items')}: ${qty}${o.weight?' | '+t('wt')+': '+E(o.weight):''}</span><span>${o.date?E(new Date(o.date).toLocaleDateString('en-IN')):''}</span></div><div>${line}</div>${o.fragile?'<b>⚠ '+t('fragt')+'</b>':''}</div>
-<div class="s f" style="font-size:10px"><div class="t">${t('from')}</div><b>${E(S.name)}</b> ${E(S.address)} ${S.phone?'| '+E(S.phone):''}${S.gstin?'<br>GSTIN: '+E(S.gstin):''}</div></div>`;
+<div class="s f" style="font-size:10px"><div class="t">${t('from')}</div><b>${E(S.name)}</b> ${E(S.address)} ${S.phone?'| '+E(S.phone):''}${validGstin(S.gstin)?'<br>GSTIN: '+E(validGstin(S.gstin)):''}</div></div>`;
   }
 
   /* ---------- output ---------- */

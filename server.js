@@ -15,7 +15,17 @@ const ADMIN_USER=process.env.ADMIN_USER||'admin';
 const ADMIN_PASS=process.env.ADMIN_PASS||'';
 const ADMIN_RESET_TOKEN=process.env.ADMIN_RESET_TOKEN||'';
 // --- Order automation config (all secrets come from environment variables, never from code) ---
-const TEST_MODE=String(process.env.TEST_MODE||'true').toLowerCase()!=='false'; // true = fake TEST AWB is auto-created; set TEST_MODE=false when Shiprocket is connected
+const TEST_MODE=String(process.env.TEST_MODE||'false').toLowerCase()==='true'; // Optional local test mode only; never generates a real courier AWB.
+const SHIPROCKET_API=(process.env.SHIPROCKET_API_BASE||'https://apiv2.shiprocket.in/v1/external').replace(/\/+$/,'');
+const SHIPROCKET_EMAIL=String(process.env.SHIPROCKET_EMAIL||'').trim();
+const SHIPROCKET_PASSWORD=String(process.env.SHIPROCKET_PASSWORD||'');
+const SHIPROCKET_PICKUP_LOCATION=String(process.env.SHIPROCKET_PICKUP_LOCATION||'').trim();
+const SHIPROCKET_PICKUP_PIN=String(process.env.SHIPROCKET_PICKUP_PIN||'').trim();
+const SHIPROCKET_DEFAULT_WEIGHT_KG=Number(process.env.SHIPROCKET_DEFAULT_WEIGHT_KG||0.5);
+const SHIPROCKET_DEFAULT_LENGTH_CM=Number(process.env.SHIPROCKET_DEFAULT_LENGTH_CM||20);
+const SHIPROCKET_DEFAULT_BREADTH_CM=Number(process.env.SHIPROCKET_DEFAULT_BREADTH_CM||15);
+const SHIPROCKET_DEFAULT_HEIGHT_CM=Number(process.env.SHIPROCKET_DEFAULT_HEIGHT_CM||5);
+let shiprocketSession={token:'',expiresAt:0};
 const RZP_KEY_ID=process.env.RAZORPAY_KEY_ID||'';
 const RZP_KEY_SECRET=process.env.RAZORPAY_KEY_SECRET||'';
 const RZP_WEBHOOK_SECRET=process.env.RAZORPAY_WEBHOOK_SECRET||'';
@@ -129,18 +139,129 @@ async function enrichYouTubeMusic(videoId,x){
 }
 
 
-// ===== Order automation helpers: auto AWB, Razorpay, email =====
-function trackingLinkFor(courier,awb){const a=encodeURIComponent(awb||''),c=String(courier||'').toLowerCase();if(!awb)return '';if(c==='delhivery')return 'https://www.delhivery.com/tracking';if(c==='shiprocket')return 'https://shiprocket.co/tracking/'+a;return ''}
-// Creates an AWB automatically once an order is Packed (or later). In TEST_MODE this is a fake AWB.
-// When Shiprocket is connected, replace the TEST block with a Shiprocket API call that returns a real AWB.
+// ===== Order automation helpers: Shiprocket, Razorpay, email =====
+function trackingLinkFor(courier,awb){const a=encodeURIComponent(awb||''),c=String(courier||'').toLowerCase();if(!awb)return '';if(c.includes('delhivery'))return 'https://www.delhivery.com/tracking';if(c.includes('shiprocket'))return 'https://shiprocket.co/tracking/'+a;return ''}
 function ensureAwb(o){
-  if(o.awb||!['Packed','Shipped','Out for Delivery','Delivered'].includes(o.status))return false;
-  if(!TEST_MODE)return false;
+  if(o.awb||!TEST_MODE||!['Packed','Shipped','Out for Delivery','Delivered'].includes(o.status))return false;
   o.awb='TEST'+String(crypto.randomInt(0,1e9)).padStart(9,'0');
-  if(!o.courier)o.courier='Delhivery';
-  const generatedTracking=trackingLinkFor(o.courier,o.awb);if(generatedTracking&&(!o.tracking_url||/delhivery\.com\/track\/package\//i.test(String(o.tracking_url))))o.tracking_url=generatedTracking;
+  if(!o.courier)o.courier='TEST';
+  o.tracking_url=trackingLinkFor(o.courier,o.awb)||'';
   audit('awb.auto',{orderId:o.orderId,awb:o.awb,test:true});
   return true;
+}
+function shiprocketConfigured(){return Boolean(SHIPROCKET_EMAIL&&SHIPROCKET_PASSWORD&&SHIPROCKET_PICKUP_LOCATION&&SHIPROCKET_PICKUP_PIN&&/^\d{6}$/.test(SHIPROCKET_PICKUP_PIN))}
+function shiprocketErrorMessage(d,status){
+  const candidates=[d?.message,d?.error,d?.errors?.message,d?.errors?.error,d?.response?.message];
+  const msg=candidates.find(v=>typeof v==='string'&&v.trim());
+  if(msg)return msg.trim().slice(0,500);
+  if(Array.isArray(d?.errors)&&d.errors.length)return JSON.stringify(d.errors).slice(0,500);
+  return 'Shiprocket API request failed ('+status+')';
+}
+async function shiprocketLogin(force=false){
+  if(!force&&shiprocketSession.token&&shiprocketSession.expiresAt>Date.now()+60000)return shiprocketSession.token;
+  if(!SHIPROCKET_EMAIL||!SHIPROCKET_PASSWORD)throw new Error('Shiprocket credentials are not configured on the server.');
+  const r=await fetch(SHIPROCKET_API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:SHIPROCKET_EMAIL,password:SHIPROCKET_PASSWORD})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.token)throw new Error('Shiprocket login failed: '+shiprocketErrorMessage(d,r.status));
+  shiprocketSession={token:String(d.token),expiresAt:Date.now()+23*60*60*1000};
+  return shiprocketSession.token;
+}
+async function shiprocketApi(method,pathname,payload,retry=true){
+  const token=await shiprocketLogin(false);
+  const r=await fetch(SHIPROCKET_API+pathname,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:payload===undefined?undefined:JSON.stringify(payload)});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401&&retry){shiprocketSession={token:'',expiresAt:0};return shiprocketApi(method,pathname,payload,false)}
+  if(!r.ok)throw new Error(shiprocketErrorMessage(d,r.status));
+  return d;
+}
+function positiveNumber(v,fallback){const n=Number(v);return Number.isFinite(n)&&n>0?n:fallback}
+function shiprocketPackage(o,x){
+  const pkg=o.package||{};
+  const items=o.items||[];
+  const qty=items.reduce((n,i)=>n+Math.max(1,Number(i.qty||1)),0)||1;
+  return {
+    weight:positiveNumber(x.weight??pkg.weight,Math.max(0.1,SHIPROCKET_DEFAULT_WEIGHT_KG*qty)),
+    length:positiveNumber(x.length??pkg.length,SHIPROCKET_DEFAULT_LENGTH_CM),
+    breadth:positiveNumber(x.breadth??pkg.breadth,SHIPROCKET_DEFAULT_BREADTH_CM),
+    height:positiveNumber(x.height??pkg.height,SHIPROCKET_DEFAULT_HEIGHT_CM)
+  };
+}
+function shiprocketItems(o){return (o.items||[]).map(i=>({name:String(i.name||'Product').slice(0,120),sku:String(i.sku||i.productId||'YT').slice(0,80),units:Math.max(1,Math.floor(Number(i.qty||1))),selling_price:priceNumber(i.price),discount:0,tax:0,hsn:String(i.hsn||'6109').slice(0,20)}))}
+async function createShiprocketShipment(o,x={}){
+  if(!shiprocketConfigured())throw new Error('Shiprocket is not configured. Add SHIPROCKET_EMAIL, SHIPROCKET_PASSWORD, SHIPROCKET_PICKUP_LOCATION and SHIPROCKET_PICKUP_PIN to the server environment.');
+  const pkg=shiprocketPackage(o,x),cod=String(o.payment||'').toLowerCase()==='cod';
+  if(!/^\d{6}$/.test(String(o.pin||'')))throw new Error('Customer delivery PIN must be a valid 6-digit PIN.');
+  if(!o.address||!o.city||!o.name||!o.phone)throw new Error('Customer name, phone, city and address are required before creating a shipment.');
+  const paymentMethod=cod?'COD':'Prepaid';
+  let shipmentId=o.shiprocket?.shipment_id||'';
+  let shiprocketOrderId=o.shiprocket?.order_id||'';
+  let created={};
+  if(!shipmentId){
+    const payload={
+      order_id:o.orderId,
+      order_date:new Date(o.date||Date.now()).toISOString().slice(0,19).replace('T',' '),
+      pickup_location:SHIPROCKET_PICKUP_LOCATION,
+      billing_customer_name:String(o.name).slice(0,100),
+      billing_last_name:'',
+      billing_address:String(o.address).slice(0,200),
+      billing_address_2:'',
+      billing_city:String(o.city).slice(0,60),
+      billing_pincode:String(o.pin),
+      billing_state:String(o.state||'').slice(0,60),
+      billing_country:'India',
+      billing_email:String(o.email||'').slice(0,120),
+      billing_phone:String(o.phone).slice(0,20),
+      shipping_is_billing:true,
+      shipping_customer_name:String(o.name).slice(0,100),
+      shipping_last_name:'',
+      shipping_address:String(o.address).slice(0,200),
+      shipping_address_2:'',
+      shipping_city:String(o.city).slice(0,60),
+      shipping_pincode:String(o.pin),
+      shipping_state:String(o.state||'').slice(0,60),
+      shipping_country:'India',
+      shipping_email:String(o.email||'').slice(0,120),
+      shipping_phone:String(o.phone).slice(0,20),
+      order_items:shiprocketItems(o),
+      payment_method:paymentMethod,
+      shipping_charges:Number(o.shipping||0),
+      sub_total:Number(o.subtotal||0),
+      length:pkg.length,breadth:pkg.breadth,height:pkg.height,weight:pkg.weight
+    };
+    created=await shiprocketApi('POST','/orders/create/adhoc',payload);
+    shipmentId=String(created.shipment_id||created.data?.shipment_id||'');
+    shiprocketOrderId=String(created.order_id||created.data?.order_id||'');
+    if(!shipmentId)throw new Error('Shiprocket created the order but did not return a shipment ID.');
+    o.shiprocket={...(o.shiprocket||{}),order_id:shiprocketOrderId,shipment_id:shipmentId,created_at:new Date().toISOString(),package:pkg};
+    await saveAndFlush(db);
+  }
+  let awb=String(created.awb_code||created.data?.awb_code||o.awb||'');
+  let courier=String(created.courier_name||created.data?.courier_name||o.courier||'');
+  let courierId=Number(x.courier_id||created.courier_company_id||created.data?.courier_company_id||0)||0;
+  if(!awb){
+    const q=new URLSearchParams({pickup_postcode:SHIPROCKET_PICKUP_PIN,delivery_postcode:String(o.pin),weight:String(pkg.weight),cod:cod?'1':'0',declared_value:String(Number(o.total||0))});
+    const svc=await shiprocketApi('GET','/courier/serviceability/?'+q.toString());
+    const list=Array.isArray(svc.data?.available_courier_companies)?svc.data.available_courier_companies:[];
+    if(!list.length)throw new Error('Shiprocket found no serviceable courier for this pickup/delivery PIN and package weight.');
+    const requested=String(x.courier||'').trim().toLowerCase();
+    const match=requested?list.find(c=>String(c.courier_name||'').toLowerCase().includes(requested)):null;
+    const chosen=match||list.slice().sort((a,b)=>Number(a.freight_charge||Infinity)-Number(b.freight_charge||Infinity))[0];
+    courierId=Number(chosen.courier_company_id||chosen.courier_id||0)||0;
+    courier=String(chosen.courier_name||'');
+    if(!courierId)throw new Error('Shiprocket returned a courier but no courier ID was available for AWB assignment.');
+    const assigned=await shiprocketApi('POST','/courier/assign/awb',{shipment_id:Number(shipmentId),courier_id:courierId});
+    const a=assigned.response?.data||assigned.data||assigned;
+    awb=String(a.awb_code||assigned.awb_code||'');
+    courier=String(a.courier_name||courier||'');
+    courierId=Number(a.courier_company_id||courierId)||courierId;
+    if(!awb)throw new Error('Shiprocket accepted the courier assignment but did not return an AWB.');
+  }
+  o.awb=awb;o.courier=courier||'Shiprocket';o.tracking_url=trackingLinkFor(o.courier,o.awb)||('https://shiprocket.co/tracking/'+encodeURIComponent(o.awb));
+  o.shiprocket={...(o.shiprocket||{}),order_id:shiprocketOrderId||o.shiprocket?.order_id||'',shipment_id:shipmentId,courier_company_id:courierId,courier_name:o.courier,awb_code:o.awb,status:o.shiprocket?.status||'AWB Assigned',updated_at:new Date().toISOString(),package:pkg};
+  if(o.status==='New'||o.status==='Confirmed')o.status='Packed';
+  audit('shipment.shiprocket.created',{orderId:o.orderId,shipmentId,awb:o.awb,courier:o.courier});
+  await saveAndFlush(db);
+  return {ok:true,order:o,shipment:o.shiprocket};
 }
 function safeEq(a,b){const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&crypto.timingSafeEqual(x,y)}
 function rawBody(req){return new Promise((resolve,reject)=>{const chunks=[];let n=0;req.on('data',c=>{n+=c.length;if(n>1e6){req.destroy();reject(new Error('Payload too large'));return}chunks.push(c)});req.on('end',()=>resolve(Buffer.concat(chunks)));req.on('error',reject)})}
@@ -345,6 +466,24 @@ async function api(req,res,p){
     const x=await body(req),f=x.kind==='label'?'labelPrints':'slipPrints',out={};
     for(const id of (Array.isArray(x.ids)?x.ids:[]).slice(0,200).map(String)){if(!db.orders.some(v=>v.orderId===id))continue;const cur=db.slip.orders[id]||(db.slip.orders[id]={});cur[f]=Math.min(1e6,(cur[f]||0)+1);out[id]={slipPrints:cur.slipPrints||0,labelPrints:cur.labelPrints||0}}
     await saveAndFlush(db);return send(res,200,{ok:true,counts:out},'application/json',origin);
+  }
+  if(req.method==='POST'&&p.match(/^\/api\/admin\/orders\/[^/]+\/shiprocket$/)){
+    if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);
+    const id=decodeURIComponent(p.slice('/api/admin/orders/'.length,-'/shiprocket'.length)),x=await body(req),o=db.orders.find(v=>v.orderId===id);
+    if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);
+    if(o.status===AWAITING)return send(res,400,{error:'This order is still waiting for online payment.'},'application/json',origin);
+    if(o.status==='Cancelled')return send(res,400,{error:'Cancelled orders cannot be shipped.'},'application/json',origin);
+    try{
+      const result=await createShiprocketShipment(o,x||{});
+      return send(res,200,{ok:true,order:result.order,shipment:result.shipment},'application/json',origin);
+    }catch(e){
+      console.warn('[shiprocket] shipment failed:',e.message);
+      audit('shipment.shiprocket.failed',{orderId:o.orderId,error:String(e.message).slice(0,300)});
+      await saveAndFlush(db);
+      const msg=String(e.message||'Shiprocket shipment creation failed');
+      const status=/not configured|credentials|pickup|delivery PIN|Customer name|Cancelled|payment/i.test(msg)?400:502;
+      return send(res,status,{error:msg},'application/json',origin);
+    }
   }
   if(req.method==='PATCH'&&p.startsWith('/api/admin/orders/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/orders/'.length)),x=await body(req),o=db.orders.find(v=>v.orderId===id);if(!o)return send(res,404,{error:'Order not found'},'application/json',origin);if(x.status!==undefined&&!STATUSES.includes(x.status))return send(res,400,{error:'Invalid order status'},'application/json',origin);if(o.status===AWAITING&&x.status!==undefined&&x.status!=='Cancelled')return send(res,400,{error:'This order is still waiting for online payment'},'application/json',origin);for(const k of ['status','awb','courier','tracking_url','verified'])if(x[k]!==undefined)o[k]=x[k];ensureAwb(o);applySlipOptions(id,x);audit('order.update',{orderId:id,fields:Object.keys(x)});await saveAndFlush(db);return send(res,200,{...o,...(db.slip.orders[id]||{})},'application/json',origin)}
   if(req.method==='DELETE'&&p.startsWith('/api/admin/orders/')){if(!auth(req,'admin'))return send(res,401,{error:'Unauthorized'},'application/json',origin);const id=decodeURIComponent(p.slice('/api/admin/orders/'.length)),i=db.orders.findIndex(v=>v.orderId===id);if(i<0)return send(res,404,{error:'Order not found'},'application/json',origin);db.orders.splice(i,1);delete db.slip.orders[id];audit('order.delete',{orderId:id});await saveAndFlush(db);return send(res,200,{ok:true},'application/json',origin)}

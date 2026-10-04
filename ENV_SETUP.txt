@@ -1,27 +1,69 @@
-YOUR TYPE - Order automation setup (Render Environment Variables)
-=================================================================
-Render dashboard -> apna service -> Environment -> neeche ke variables add karo, phir Save (auto redeploy hoga).
+YOUR TYPE - Production environment setup
+========================================
 
-SITE_URL                 = apni Render site ka poora link, jaise https://your-type-xxxx.onrender.com  (email ke tracking link isi se bante hain)
-TEST_MODE                = true   (abhi testing: order Packed hote hi nakli AWB TEST123456789 ban jata hai)
-                                   Launch par Shiprocket jodne ke baad false karna.
+These variables must be added to the SERVER environment (Render/Vercel/your Node host).
+Never put Shiprocket or Razorpay secrets inside admin.html or GitHub.
 
-RAZORPAY_KEY_ID          = rzp_test_...   (Razorpay dashboard, Test Mode ON -> Settings -> API Keys)
-RAZORPAY_KEY_SECRET      = (wahi page ka secret)
-RAZORPAY_WEBHOOK_SECRET  = koi bhi lamba random text, jo aap webhook banate waqt Razorpay mein bhi daaloge
+SITE_URL
+  Your public website URL, for example https://your-type-shop.vercel.app
 
-RESEND_API_KEY           = re_...   (resend.com free account -> API Keys)
-MAIL_FROM                = (optional) YOUR TYPE <onboarding@resend.dev>
-                           Bina domain verify kiye Resend sirf aapke apne signup email par mail bhejta hai.
-                           (Brevo use karna ho toh RESEND_API_KEY ki jagah BREVO_API_KEY daalo aur MAIL_FROM me
-                           Brevo mein verified sender email daalo.)
+TEST_MODE
+  false  = normal production behaviour (recommended)
+  true   = optional local/testing mode only; it may generate a TEST AWB and is NOT a real courier shipment.
 
-Razorpay webhook (Test Mode ON rakhkar): Settings -> Webhooks -> Add
-  URL    : SITE_URL + /api/payments/razorpay/webhook
-  Secret : wahi RAZORPAY_WEBHOOK_SECRET
-  Events : payment.captured, order.paid, payment.failed
+-------------------------
+SHIPROCKET
+-------------------------
 
-Test card : 4111 1111 1111 1111, koi bhi aage ki expiry, koi bhi CVV
-Test UPI  : success@razorpay (pass), failure@razorpay (fail)
+SHIPROCKET_EMAIL
+  Your Shiprocket account/API login email.
 
-Launch se pehle: rzp_test keys ki jagah rzp_live keys, webhook live mode me bhi banao, aur real AWB ke liye Shiprocket jodo.
+SHIPROCKET_PASSWORD
+  Your Shiprocket account/API password.
+
+SHIPROCKET_PICKUP_LOCATION
+  Exact pickup/warehouse location name configured in Shiprocket.
+
+SHIPROCKET_PICKUP_PIN
+  6-digit pickup PIN configured for that Shiprocket pickup location.
+
+Optional package defaults (Admin can override these while creating a shipment):
+SHIPROCKET_DEFAULT_WEIGHT_KG = 0.5
+SHIPROCKET_DEFAULT_LENGTH_CM = 20
+SHIPROCKET_DEFAULT_BREADTH_CM = 15
+SHIPROCKET_DEFAULT_HEIGHT_CM = 5
+
+Shiprocket flow in this build:
+  YOUR TYPE Admin -> Create Shipment -> Shiprocket order -> serviceability -> courier selection -> AWB assignment ->
+  AWB/courier/shipment ID saved in YOUR TYPE -> Packing Slip + Track Order.
+
+If Shiprocket credentials are missing, the Create Shipment action fails safely instead of generating a fake production AWB.
+
+-------------------------
+RAZORPAY
+-------------------------
+
+RAZORPAY_KEY_ID
+RAZORPAY_KEY_SECRET
+RAZORPAY_WEBHOOK_SECRET
+
+-------------------------
+EMAIL (optional)
+-------------------------
+
+RESEND_API_KEY
+MAIL_FROM
+
+OR use:
+BREVO_API_KEY
+MAIL_FROM
+
+-------------------------
+IMPORTANT
+-------------------------
+
+1. Do NOT send passwords/tokens in chat.
+2. Add them only to the hosting provider's Environment Variables/Secrets.
+3. After adding/changing variables, redeploy/restart the server.
+4. Do not set TEST_MODE=true on a production store.
+5. A real AWB is considered working only after Shiprocket returns it and YOUR TYPE saves it to the order.

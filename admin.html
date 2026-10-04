@@ -1658,7 +1658,7 @@ async function restoreServerBackup(){
     return loaded[k]=new Promise(res=>{const s=document.createElement('script');s.src=LIBS[k];s.onload=()=>res(!!test());s.onerror=()=>res(false);document.head.appendChild(s)})}
   function loadFont(){if(document.getElementById('ytSlipFont'))return;const l=document.createElement('link');l.id='ytSlipFont';l.rel='stylesheet';l.href=FONT;document.head.appendChild(l)}
   function toDataUrl(url){if(!url)return Promise.resolve('');if(/^data:/.test(url))return Promise.resolve(url);
-    return new Promise(res=>{try{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);res(c.toDataURL('image/jpeg',.9))}catch(_){res('')}};im.onerror=()=>res('');im.src=new URL(url,location.href).href}catch(_){res('')}})}
+    return new Promise(res=>{try{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{try{const c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;c.getContext('2d').drawImage(im,0,0);res(c.toDataURL('image/jpeg',.98))}catch(_){res('')}};im.onerror=()=>res('');im.src=new URL(url,location.href).href}catch(_){res('')}})}
 
   /* ---------- settings ---------- */
   const DEF={lang:'en',logo:'',name:'Your Type',gstin:'',address:'',phone:'',email:'',policy:'Returns / exchange within 7 days of delivery with tags intact and original packaging.',promo:'Next order par 10% off - code THANKS10',social:'',returnUrl:'https://yourtype.in/return?order={id}',trackUrl:'https://yourtype.in/track?order={id}',badges:true};
@@ -1695,8 +1695,8 @@ async function restoreServerBackup(){
 .ys .bar{height:38px;margin-top:2px}.ys .bar svg{height:38px;width:100%}
 .ys .strip{display:grid;grid-template-columns:repeat(4,1fr);padding:0}.ys .strip>div{padding:12px 14px;border-right:1px solid #d9d9d9}.ys .strip>div:last-child{border:0}
 .ys .strip b{display:block;font-size:12.5px;margin:4px 0 2px}
-.ys .addr{display:grid;grid-template-columns:1fr 1fr .9fr}.ys .addr>div{padding:6px 14px;border-right:1px solid #d9d9d9;line-height:1.6}
-.ys .addr>div:last-child{border:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.ys .addr b{display:block;font-size:12px;margin:3px 0}
+.ys .addr{display:grid;grid-template-columns:1.08fr 1.12fr .92fr;gap:0;border:1px solid #d9d9d9;border-radius:7px;overflow:hidden;background:#fff}.ys .addr>div{padding:11px 13px;border-right:1px solid #d9d9d9;line-height:1.55;min-height:92px}.ys .addr>div:last-child{border:0}.ys .addr b{display:block;font-size:12px;margin:4px 0}.ys .addr .small{line-height:1.4}
+.ys .addr .addrTitle{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:1.2px;color:#111;font-weight:800;text-transform:uppercase;margin-bottom:5px}.ys .addr .addrTitle .pill{font-size:7px;letter-spacing:.8px;border:1px solid #bbb;border-radius:999px;padding:2px 5px;color:#555}.ys .addr .flow{display:flex;align-items:center;gap:7px;margin-top:7px;font-size:9px;font-weight:800;letter-spacing:1px}.ys .addr .flow .arrow{font-size:12px}.ys .addr .shipment{background:#f5f5f5}.ys .addr .shipment .row{border:0;padding:2px 0;font-size:9.5px}.ys .addr .shipment .row b{font-size:10.5px;margin:0}.ys .addr.invoiceAddr{grid-template-columns:1fr 1fr 1fr 1fr}.ys .addr.invoiceAddr>div{min-height:96px}.ys .addr .billing{background:#fafafa}
 .ys .script{font-family:Caveat,cursive;font-size:24px;line-height:1.1;transform:rotate(-6deg)}
 .ys table{width:100%;border-collapse:collapse;background:#fafafa}
 .ys th{background:#0d0f10;color:#fff;font-size:8.5px;letter-spacing:1.5px;text-align:left;padding:10px 8px;text-transform:uppercase}
@@ -1734,6 +1734,8 @@ async function restoreServerBackup(){
     await Promise.all(items.map(async it=>it.img=await toDataUrl(it.image)));
     const id=oid(o)||'—',isCOD=String(o.payment||'cod').toUpperCase()==='COD',date=o.date?new Date(o.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
     const A=addrLines(o).map(E).join('<br>'),name=E(o.customer||o.name||'—'),contact=E(o.phone||'')+(o.email?'<br>'+E(o.email):'');
+    const billingRaw=o.billingAddress||o.billing_address||o.billAddress||o.bill_address||'';
+    const billingText=billingRaw?E(String(billingRaw).replace(/\s+/g,' ').trim()):'Same as shipping address';
     const gift=o.gift||o.isGift,giftMsg=o.giftMessage||o.giftMsg||'',note=o.note||o.notes||o.customerNote||o.instructions||'',hidePrice=!inv&&!!(gift||o.hidePrice);
     const nb=(a,b,c)=>`<div class="nt ${c||''}"><span class="lbl">${a}</span><div>${b}</div></div>`;
     const extra=(o.fragile||giftMsg||note)?`<div class="ntw">${o.fragile?nb(t('frag'),t('fragt'),'fr'):''}${giftMsg?nb(t('gift'),E(giftMsg)):''}${note?nb(t('note'),E(note)):''}</div>`:'';
@@ -1750,7 +1752,11 @@ async function restoreServerBackup(){
 <div class="body"><div class="top"><div><h1>${t(inv?'invoice':'slip')}</h1><p>${t('thanks')}</p><p style="letter-spacing:1px;font-size:11px">${t('items')}: ${qtyT}${o.weight?' &nbsp;|&nbsp; '+t('wt')+': '+E(o.weight):''}${inv?' &nbsp;|&nbsp; '+t('date')+': '+E(date):''}</p></div>
 <div class="box oid"><div class="lbl">${t('oid')}</div><b>${E(id)}</b><div class="bar">${barSvg}</div><div class="small">${t('scan')}</div></div></div>
 <div class="box strip"><div><span class="lbl">${t('odate')}</span><b>${E(date)}</b></div><div><span class="lbl">${t('pay')}</span><b>${isCOD?'COD':E(String(o.payment).toUpperCase())}</b><span class="small">${t(isCOD?'cod':'paid')}</span></div><div><span class="lbl">${t('status')}</span><b>${E(o.status||'New')}</b><span class="small">${o.status==='Packed'?t('ready'):''}</span></div><div><span class="lbl">${t('partner')}</span><b>${E(o.courier||t('tbd'))}</b><span class="small">${o.awb?'AWB: '+E(o.awb):t('soon')}</span></div></div>
-<div class="addr"><div><span class="lbl">${t('from')} / SHIPPER · WAREHOUSE / STORE</span><b>${E(S.name)}</b>${S.address?E(S.address):'<span class="small">Warehouse / store address not set</span>'}${S.phone?'<br>📞 '+E(S.phone):''}${S.gstin?'<br>GSTIN: '+E(S.gstin):''}</div><div><span class="lbl">${t('to')} / CUSTOMER · DELIVERY ADDRESS</span><b>${name}</b>${A}<br><br>${contact}</div><div><div class="script">${t('ty1')}<br>${t('ty2')}</div><div class="small" style="margin-top:10px">FROM → COURIER → TO</div></div></div>
+<div class="addr ${inv?'invoiceAddr':''}">
+<div><div class="addrTitle"><span>${t('from')}</span><span class="pill">SHIPPER</span></div><b>${E(S.name)}</b>${S.address?E(S.address):'<span class="small">Warehouse / store address not set</span>'}${S.phone?'<br>📞 '+E(S.phone):''}${S.gstin?'<br>GSTIN: '+E(S.gstin):''}</div>
+<div><div class="addrTitle"><span>${t('to')}</span><span class="pill">CUSTOMER</span></div><b>${name}</b>${A}<br>${contact}</div>
+${inv?`<div class="billing"><div class="addrTitle"><span>BILL TO</span><span class="pill">INVOICE</span></div><b>${name}</b><div class="small">${billingText}</div></div>`:''}
+<div class="shipment"><div class="addrTitle"><span>SHIPMENT</span><span class="pill">COURIER</span></div><div class="row"><span>Courier</span><b>${E(o.courier||t('tbd'))}</b></div><div class="row"><span>AWB / Tracking</span><b>${E(o.awb||'—')}</b></div><div class="flow"><span>FROM</span><span class="arrow">→</span><span>COURIER</span><span class="arrow">→</span><span>TO</span></div></div></div>
 <table><thead><tr><th class="c">${t('sno')}</th><th>${t('prod')}</th><th class="c">${t('sku')}</th><th class="c">${t('size')}</th><th class="c">${t('qty')}</th><th class="r">${t('unit')}</th><th class="r">${t('total')}</th></tr></thead><tbody>${rows}</tbody></table>${extra}
 <div class="mid">${S.badges?`<div class="badges"><div><span>✔</span>${t('q1')}</div><div><span>🚚</span>${t('q2')}</div><div><span>♻</span>${t('q3')}</div><div><span>☎</span>${t('q4')}</div></div>`:'<div></div>'}
 <div class="box${hidePrice?' hp':''}"><div class="row"><span>${t('sub')}</span><b>${inr(F.sub)}</b></div><div class="row"><span>${t('shp')}</span><b>${F.ship?inr(F.ship):t('free')}</b></div>${F.disc?`<div class="row disc"><span>${t('disc')}${o.couponCode?' ('+E(o.couponCode)+')':''}</span><b>- ${inr(F.disc)}</b></div>`:''}<div class="row"><span>${t('gst')} ${F.rate}%)</span><b>${inr(F.gst)}</b></div><div class="grand"><span>${t('total').toUpperCase()}</span><span>${inr(F.total)}</span></div><div class="small">(${t('incl')} ${F.gst} @ ${F.rate}%)</div>${!inv?(isCOD?`<div class="cod"><span class="lbl">${t('collect')}</span><b>${inr(F.total)}</b></div>`:`<div class="cod"><b>${t('prepaid')}</b></div>`):''}</div></div>${promo}
@@ -1813,10 +1819,10 @@ async function restoreServerBackup(){
       for(let i=0;i<htmls.length;i++){
         host.innerHTML='<style>'+CSS+'.ys{min-height:'+sp.px+'px}</style>'+htmls[i];await new Promise(r=>setTimeout(r,200));
         const node=host.firstElementChild.nextElementSibling;
-        const cv=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+        const cv=await html2canvas(node,{scale:2.5,backgroundColor:'#ffffff',useCORS:true,logging:false});
         if(!pdf)pdf=new jsPDF({orientation:'portrait',unit:'mm',format:[sp.w,sp.h],compress:true});else pdf.addPage([sp.w,sp.h],'portrait');
         let w=sp.w,h=sp.w*cv.height/cv.width;if(h>sp.h){w=sp.w*sp.h/h;h=sp.h}
-        pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',(sp.w-w)/2,0,w,h);
+        pdf.addImage(cv.toDataURL('image/jpeg',.98),'JPEG',(sp.w-w)/2,0,w,h);
       }
       host.remove();step='save';pdf.save(fname+'.pdf');
       await afterPrint(orders,kind);toast((orders.length>1?orders.length+' PDFs':'PDF')+' downloaded');

@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Checkout — YOUR TYPE</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="description" content="Secure checkout at YOUR TYPE.">
+<meta property="og:title" content="Checkout — YOUR TYPE">
+<meta property="og:description" content="Secure checkout at YOUR TYPE.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/photos/dragon.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="/music-player.css">
 <style>
@@ -179,7 +186,7 @@ let checkoutSettings={shipping:99,freeShipping:Infinity};
 const priceOf=p=>Number(String(p?.[1]??p?.price??0).replace(/[^0-9]/g,''))||0;
 const summary=document.getElementById('summary');
 if(!cart.length){summary.innerHTML='<p style="color:#777;font-size:11px;line-height:1.7">Your bag is empty. <a href="index.html">Return to shop</a>.</p>';document.querySelector('.checkout').disabled=true;}
-else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
+else{summary.innerHTML=cart.map(p=>`<div class="sumItem"><img loading="lazy" src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');}
 let subtotal=cart.reduce((s,p)=>s+priceOf(p)*Number(p.qty||1),0);
 let shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
 let discount=0,appliedCoupon=''; let total=subtotal+shipping;
@@ -192,7 +199,7 @@ async function initCheckout(){
   subtotal=cart.reduce((sum,p)=>sum+priceOf(p)*Number(p.qty||1),0);
   shipping=subtotal===0?0:(subtotal>=checkoutSettings.freeShipping?0:checkoutSettings.shipping);
   total=subtotal+shipping;
-  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
+  if(cart.length)summary.innerHTML=cart.map(p=>`<div class="sumItem"><img loading="lazy" src="${imageUrl(p[2])}" alt="${String(p[0]||'Product').replace(/[<>]/g,'')}" onerror="this.onerror=null;this.src='/photos/ornament.jpg'"><span>${p[0]}<small>${p[1]}${p.size?' · SIZE '+p.size:''}${p.color?' · '+p.color.toUpperCase():''} · QTY ${Number(p.qty||1)}</small></span></div>`).join('');
   document.getElementById('sumSubtotal').textContent=money(subtotal);
   document.getElementById('sumShipping').textContent=shipping===0?(subtotal>=checkoutSettings.freeShipping?'FREE':'—'):money(shipping);
   document.getElementById('sumTotal').textContent=money(total);
@@ -275,7 +282,7 @@ function showOrderDetails(){
  let p=null;try{p=JSON.parse(localStorage.getItem('yourTypeLastOrder')||'null')}catch(e){}
  if(!p||!p.orderId){closeOrderModal();return}
  const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const items=(p.items||[]).map(i=>`<div class="odItem">${i.image?`<img src="${E(i.image)}" alt="">`:'<span></span>'}<div><b>${E(i.name)}</b><small>Size ${E(i.size||'M')} · ${E(i.color||'Black')} · Qty ${Number(i.qty||1)}</small></div><b>${money(Number(i.price||0)*Number(i.qty||1))}</b></div>`).join('');
+ const items=(p.items||[]).map(i=>`<div class="odItem">${i.image?`<img loading="lazy" src="${E(i.image)}" alt="">`:'<span></span>'}<div><b>${E(i.name)}</b><small>Size ${E(i.size||'M')} · ${E(i.color||'Black')} · Qty ${Number(i.qty||1)}</small></div><b>${money(Number(i.price||0)*Number(i.qty||1))}</b></div>`).join('');
  const disc=Number(p.discount||0),pay=String(p.payment||'cod').toLowerCase()==='cod'?'Cash on Delivery':String(p.payment||'').toUpperCase();
  const when=p.date?new Date(p.date).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'';
  document.getElementById('orderDetailBox').innerHTML=`<h4>Order</h4><p><b style="color:#fff">${E(p.orderId)}</b>${when?'<br>'+E(when):''}</p>

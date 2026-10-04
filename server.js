@@ -461,7 +461,10 @@ const server=http.createServer(async(req,res)=>{
  // Only public site files are served. Server code, data, backups, notes and old pages are never exposed.
  const PUBLIC_EXT=new Set(['.html','.css','.js','.jpg','.jpeg','.png','.webp','.gif','.svg','.ico','.mp4','.webm','.woff','.woff2']);
  const PRIVATE_NAME=/^(server\.js|supabase-store\.js|package(-lock)?\.json|render\.yaml|data\.json.*|admin-auth\.json|.*-old\.html)$/i;
- if(relp[0]==='..'||path.isAbsolute(path.relative(ROOT,file))||relp.some(x=>x.startsWith('.'))||relp[0]==='backups'||relp[0]==='node_modules'||PRIVATE_NAME.test(relp[relp.length-1])||!PUBLIC_EXT.has(ext)||!fs.existsSync(file)||fs.statSync(file).isDirectory())return send(res,404,'Not found','text/plain');
+ if(relp[0]==='..'||path.isAbsolute(path.relative(ROOT,file))||relp.some(x=>x.startsWith('.'))||relp[0]==='backups'||relp[0]==='node_modules'||PRIVATE_NAME.test(relp[relp.length-1])||!PUBLIC_EXT.has(ext)||!fs.existsSync(file)||fs.statSync(file).isDirectory()){
+  if(ext==='.html'||!ext){try{const nf=fs.readFileSync(path.join(ROOT,'404.html'));res.writeHead(404,{'Content-Type':'text/html; charset=utf-8','X-Content-Type-Options':'nosniff'});return res.end(nf)}catch{}}
+  return send(res,404,'Not found','text/plain');
+ }
  const st=fs.statSync(file),h={'Content-Type':mime[ext]||'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':ext==='.html'?'no-cache':'public, max-age=604800','Accept-Ranges':'bytes'};
  try{
   const rg=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range||'');
